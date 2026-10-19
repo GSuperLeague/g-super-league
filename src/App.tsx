@@ -123,6 +123,44 @@ function Avatar({
     </span>
   );
 }
+function PickupLineup({
+  match,
+  side,
+  players,
+}: {
+  match: Match;
+  side: "home" | "away";
+  players: Player[];
+}) {
+  const name = (id: string) =>
+    players.find((p) => p.id === id)?.name || "已归档球员";
+  const roster = side === "home" ? match.homePlayers : match.awayPlayers;
+  const roles = match.summary
+    ? [
+        { label: "前锋", id: match.summary[`${side}ForwardId`] },
+        { label: "后卫", id: match.summary[`${side}DefenderId`] },
+      ]
+    : null;
+  return (
+    <span className="pickup-lineup">
+      {roles ? (
+        roles.map((role) => (
+          <span className="pickup-role" key={role.label}>
+            <small>{role.label}：</small>
+            <b>{name(role.id)}</b>
+          </span>
+        ))
+      ) : (
+        <>
+          {roster.map((id) => (
+            <b key={id}>{name(id)}</b>
+          ))}
+          <small>{roster.length ? "位置未记录" : "阵容待定"}</small>
+        </>
+      )}
+    </span>
+  );
+}
 function Radar({
   skills,
   small = false,
@@ -616,10 +654,16 @@ export default function Home() {
             )}
           </span>
         </div>
-        <div className="versus">
+        <div className={`versus ${m.kind === "pickup" ? "pickup-versus" : ""}`}>
           <div>
-            <Badge team={team(m.homeId)} />
-            <b>{team(m.homeId)?.name}</b>
+            {m.kind === "pickup" ? (
+              <PickupLineup match={m} side="home" players={s.players} />
+            ) : (
+              <>
+                <Badge team={team(m.homeId)} />
+                <b>{team(m.homeId)?.name}</b>
+              </>
+            )}
           </div>
           <strong>
             {m.status === "scheduled" ? (
@@ -631,8 +675,14 @@ export default function Home() {
             )}
           </strong>
           <div>
-            <Badge team={team(m.awayId)} />
-            <b>{team(m.awayId)?.name}</b>
+            {m.kind === "pickup" ? (
+              <PickupLineup match={m} side="away" players={s.players} />
+            ) : (
+              <>
+                <Badge team={team(m.awayId)} />
+                <b>{team(m.awayId)?.name}</b>
+              </>
+            )}
           </div>
         </div>
         <div className="match-foot">
@@ -1312,10 +1362,22 @@ export default function Home() {
                         )}
                       </span>
                     </div>
-                    <div className="big-score">
+                    <div
+                      className={`big-score ${current.kind === "pickup" ? "pickup-score" : ""}`}
+                    >
                       <div>
-                        <Badge team={team(current.homeId)} size="large" />
-                        <h2>{team(current.homeId)?.name}</h2>
+                        {current.kind === "pickup" ? (
+                          <PickupLineup
+                            match={current}
+                            side="home"
+                            players={s.players}
+                          />
+                        ) : (
+                          <>
+                            <Badge team={team(current.homeId)} size="large" />
+                            <h2>{team(current.homeId)?.name}</h2>
+                          </>
+                        )}
                         <span>主队</span>
                       </div>
                       <strong>
@@ -1324,8 +1386,18 @@ export default function Home() {
                         {score(current)[1]}
                       </strong>
                       <div>
-                        <Badge team={team(current.awayId)} size="large" />
-                        <h2>{team(current.awayId)?.name}</h2>
+                        {current.kind === "pickup" ? (
+                          <PickupLineup
+                            match={current}
+                            side="away"
+                            players={s.players}
+                          />
+                        ) : (
+                          <>
+                            <Badge team={team(current.awayId)} size="large" />
+                            <h2>{team(current.awayId)?.name}</h2>
+                          </>
+                        )}
                         <span>客队</span>
                       </div>
                     </div>

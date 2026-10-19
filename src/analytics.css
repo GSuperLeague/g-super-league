@@ -77,6 +77,63 @@
 .settlement-team b small {
   line-height: 1.7;
 }
+.pickup-lineup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
+}
+.pickup-role {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 3px;
+}
+.pickup-lineup small {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pickup-lineup b {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.versus.pickup-versus,
+.big-score.pickup-score {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+}
+.pickup-versus > div,
+.pickup-score > div {
+  min-width: 0;
+}
+.big-score.pickup-score > div {
+  align-items: center;
+}
+.pickup-score .pickup-lineup b {
+  font-size: 16px;
+}
+.pickup-score .pickup-lineup small {
+  color: #b0c1a0;
+}
+@media (max-width: 560px) {
+  .big-score.pickup-score {
+    gap: 10px;
+  }
+  .pickup-score .pickup-lineup b {
+    font-size: 12px;
+  }
+  .big-score.pickup-score > strong {
+    font-size: 54px;
+    gap: 10px;
+  }
+}
 .ranking-table th:nth-child(2),
 .ranking-table td:nth-child(2) {
   position: sticky;
