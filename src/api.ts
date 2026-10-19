@@ -1,4 +1,4 @@
-export const apiBase = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '');
+export const apiBase = (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? new URL(import.meta.env.BASE_URL, window.location.origin).href : '')).trim().replace(/\/$/, '');
 export const apiConfigured = Boolean(apiBase);
 const tokenKey = 'g-super-league:admin-token';
 export function adminToken(){return sessionStorage.getItem(tokenKey)||''}

@@ -5,6 +5,7 @@ dist/
 !.env.example
 .dev.vars*
 .migration/
+/G超联赛-*.json
 backend/wrangler.jsonc
 *.tsbuildinfo
 
