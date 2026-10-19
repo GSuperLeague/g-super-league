@@ -1,98 +1,2942 @@
-import {apiFetch,apiConfigured,photoUrl,adminToken,clearAdmin,loginAdmin} from './api';
-import {useState,useEffect,useRef,useCallback,FormEvent,ReactNode} from 'react';
-import {ArrowUpRight,ArrowRight,Plus,LayoutDashboard,CalendarDays,Trophy,Goal,Users,Shield,Settings,ChevronRight,ChevronLeft,Search,X,Check,Radio,Flag,MoreHorizontal,Pencil,Trash2,Upload,Download,RefreshCw,Info,Activity,UserRound,MoveUpRight,CheckCircle2,Loader2,Undo2,Play,Menu,Target} from 'lucide-react';
-import {League,Team,Player,Match,emptyLeague,standings,scorers,score,dimensions,playerTeamIds,isTeamMember,defenders,matchTeam} from '@/lib/league';
-type Page='overview'|'matches'|'table'|'scorers'|'defenders'|'players'|'teams'|'settings';
-type Dialog={kind:string;data?:any};
-const nav=[{id:'overview',label:'联赛总览',icon:LayoutDashboard},{id:'matches',label:'赛程与比分',icon:CalendarDays},{id:'table',label:'球队积分榜',icon:Trophy},{id:'scorers',label:'射手榜',icon:Goal},{id:'defenders',label:'防守榜',icon:Shield},{id:'players',label:'球员档案',icon:Users},{id:'teams',label:'球队管理',icon:Shield}];
-const uid=()=>crypto.randomUUID();
-const signed=(value:number,digits=0)=>{const rounded=Number(value.toFixed(digits));return `${rounded>0?'+':''}${rounded.toFixed(digits)}`};
-const dateLabel=(t:string)=>new Date(t).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
-const dateInput=(t?:string)=>new Date(t||Date.now()).toLocaleString('sv-SE',{timeZone:'Asia/Shanghai'}).slice(0,16).replace(' ','T');
-function Badge({team,size='normal'}:{team?:Team;size?:string}){return <span className={`badge ${size}`} style={{'--team':team?.color||'#638276'} as any}><Shield size={size==='large'?38:23} strokeWidth={1.4}/><b>{team?.short?.slice(0,2)||'G'}</b></span>}
-function Avatar({player,large=false}:{player:Player;large?:boolean}){return <span className={`avatar ${large?'avatar-large':''}`}>{player.photo?<img src={photoUrl(player.photo)} alt={`${player.name}头像`}/>:<span>{player.name.slice(-2)}</span>}</span>}
-function Radar({skills,small=false}:{skills:number[];small?:boolean}){const xy=(r:number,i:number)=>`${150+Math.sin(i*Math.PI/3)*r},${138-Math.cos(i*Math.PI/3)*r}`;return <svg role="img" aria-label={`六维能力：${dimensions.map((n,i)=>`${n} ${skills[i]}`).join('，')}`} viewBox="0 0 300 285" className={`radar ${small?'radar-small':''}`}>{[.25,.5,.75,1].map(r=><polygon key={r} points={dimensions.map((_,i)=>xy(96*r,i)).join(' ')} fill="none" stroke="currentColor" opacity=".15"/>)}{dimensions.map((_,i)=><line key={i} x1="150" y1="138" x2={xy(96,i).split(',')[0]} y2={xy(96,i).split(',')[1]} stroke="currentColor" opacity=".12"/>)}<polygon points={skills.map((v,i)=>xy(v*.96,i)).join(' ')} fill="#8fba45" fillOpacity=".23" stroke="#6d912d" strokeWidth="2"/>{skills.map((v,i)=><circle key={i} cx={xy(v*.96,i).split(',')[0]} cy={xy(v*.96,i).split(',')[1]} r="3" fill="#719b30"/>)}{dimensions.map((d,i)=><text key={d} x={xy(123,i).split(',')[0]} y={Number(xy(123,i).split(',')[1])+4} textAnchor="middle" fontSize="11" fill="currentColor">{d} {skills[i]}</text>)}</svg>}
-function Pitch(){return <div className="pitch-art" aria-hidden="true"><span className="pitch-word">G SUPER<br/>LEAGUE</span><svg viewBox="0 0 580 360"><defs><linearGradient id="field" x1="0" x2="1" y1="0" y2="1"><stop stopColor="#3b6553"/><stop offset="1" stopColor="#214336"/></linearGradient><linearGradient id="rod"><stop stopColor="#d7dfcf"/><stop offset=".5" stopColor="#819988"/><stop offset="1" stopColor="#c2cdbb"/></linearGradient></defs><g transform="translate(90 50) rotate(-15 200 125) skewX(12)"><rect x="-12" y="8" width="410" height="265" rx="11" fill="#142d24"/><rect x="-12" y="-7" width="410" height="265" rx="11" fill="#567359"/><rect width="385" height="244" rx="5" fill="url(#field)"/>{[0,1,2,3,4,5].map(i=><rect key={i} x={i*64} width="32" height="244" fill="#fff" opacity=".025"/>)}<g stroke="#c6d9a9" strokeWidth="1.5" opacity=".45" fill="none"><rect x="16" y="15" width="354" height="214"/><path d="M193 15v214"/><circle cx="193" cy="122" r="39"/><path d="M16 68h54v108H16M370 68h-54v108h54M16 94h20v55H16M370 94h-20v55h20"/></g>{[42,119,265,343].map((x,i)=><g key={x}><rect x={x-2} y="-32" width="5" height="308" rx="2" fill="url(#rod)"/><rect x={x-7} y={i<2?249:-46} width="15" height="42" rx="4" fill="#13281f"/>{(i===0||i===3?[122]:[65,178]).map(y=><g key={y}><rect x={x-10} y={y+8} width="28" height="10" rx="3" fill="#102a1e" opacity=".35"/><rect x={x-10} y={y-4} width="20" height="15" rx="4" fill={i<2?'#d2f492':'#e9e9d5'}/><rect x={x-6} y={y+7} width="12" height="17" rx="3" fill={i<2?'#a4c962':'#bcc5b1'}/><circle cx={x} cy={y-6} r="7" fill={i<2?'#d6f7a0':'#fffdeb'}/></g>)}</g>)}<circle cx="218" cy="154" r="7" fill="#fff9d6"/><circle cx="220" cy="157" r="7" fill="#11281e" opacity=".15"/></g></svg><span className="pitch-coordinate">120 × 70 CM · 无限可能</span></div>}
-function Empty({icon:Icon=Flag,title,desc,action,label}:{icon?:any;title:string;desc:string;action?:()=>void;label?:string}){return <div className="empty"><span className="empty-icon"><Icon size={27} strokeWidth={1.3}/></span><h3>{title}</h3><p>{desc}</p>{action&&<button className="btn secondary" onClick={action}>{label}<ArrowUpRight size={15}/></button>}</div>}
-function Modal({title,children,onClose,wide=false}:{title:string;children:ReactNode;onClose:()=>void;wide?:boolean}){const ref=useRef<HTMLDivElement>(null);useEffect(()=>{const old=document.activeElement as HTMLElement;const prev=document.body.style.overflow;document.body.style.overflow='hidden';ref.current?.focus();const handler=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();if(e.key==='Tab'){const els=ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]');if(!els?.length)return;const first=els[0],last=els[els.length-1];if(e.shiftKey&&(document.activeElement===first||document.activeElement===ref.current)){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}};document.addEventListener('keydown',handler);return()=>{document.body.style.overflow=prev;document.removeEventListener('keydown',handler);old?.focus()}},[onClose]);return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><div className={`modal ${wide?'wide':''}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref}><header><div><span className="eyebrow">G SUPER LEAGUE</span><h2>{title}</h2></div><button aria-label="关闭" className="icon-btn" onClick={onClose}><X size={21}/></button></header>{children}</div></div>}
-export default function Home(){
- const [s,setS]=useState<League>(emptyLeague),[loaded,setLoaded]=useState(false),[online,setOnline]=useState(true),[page,setPage]=useState<Page>('overview'),[dialog,setDialog]=useState<Dialog|null>(null),[toast,setToast]=useState(''),[busy,setBusy]=useState(false),[query,setQuery]=useState(''),[teamFilter,setTeamFilter]=useState(''),[matchFilter,setMatchFilter]=useState('all'),[selectedMatch,setSelectedMatch]=useState<string|null>(null),[selectedPlayer,setSelectedPlayer]=useState<string|null>(null);
- const [isAdmin,setIsAdmin]=useState(()=>Boolean(adminToken())),[authOpen,setAuthOpen]=useState(false),[authError,setAuthError]=useState('');
- const revision=useRef(-1), toastTimer=useRef<any>(null),saving=useRef(false);
- const notify=(m:string)=>{setToast(m);clearTimeout(toastTimer.current);toastTimer.current=setTimeout(()=>setToast(''),5000)};
- const accept=useCallback((r:any)=>{if(r.revision>=revision.current){revision.current=r.revision;setS(r.data)}setLoaded(true);setOnline(true)},[]);
- const refresh=useCallback(async()=>{try{const r=await apiFetch('/api/league',{cache:'no-store'});if(!r.ok)throw Error();accept(await r.json())}catch{setOnline(false)}},[accept]);
- useEffect(()=>{refresh();const timer=setInterval(()=>{if(!document.hidden)refresh()},3000);const onVisible=()=>{if(!document.hidden)refresh()};document.addEventListener('visibilitychange',onVisible);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',onVisible)}},[refresh]);
- const mutate=async(action:any,close=true)=>{if(saving.current)return false;saving.current=true;setBusy(true);try{const r=await apiFetch('/api/league',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action)});const body:any=await r.json();if(!r.ok)throw Error(body.error||'保存失败');accept(body);if(close)setDialog(null);notify('已保存，联赛数据已更新');return true}catch(e){notify(e instanceof Error?e.message:'网络异常，请重试');return false}finally{saving.current=false;setBusy(false)}};
- const go=(p:Page)=>{setPage(p);setQuery('');setTeamFilter('');setSelectedPlayer(null);setSelectedMatch(null)};
- const close=useCallback(()=>setDialog(null),[]);
- const team=(id:string)=>{const t=s.teams.find(t=>t.id===id);if(t)return t;const m=s.matches.find(m=>m.kind==='pickup'&&(m.homeId===id||m.awayId===id));return m?matchTeam(s.teams,m,id):undefined};
- const player=(id:string)=>s.players.find(p=>p.id===id);
- const playerTeamNames=(p:Player)=>playerTeamIds(p).map(id=>team(id)?.name).filter(Boolean).join(' / ');
- const editTeam=(t?:Team)=>setDialog({kind:'team',data:t});
- const editPlayer=(p?:Player)=>{if(!s.teams.length){notify('先登记一支球队，就可以添加球员了');editTeam();return}setDialog({kind:'player',data:p})};
- const editMatch=(m?:Match)=>setDialog({kind:'match',data:m});
- const editResult=(m?:Match)=>setDialog({kind:'result',data:m});
- const confirm=(title:string,desc:string,action:any)=>setDialog({kind:'confirm',data:{title,desc,action}});
- const live=s.matches.filter(m=>m.status==='live'),table=standings(s),rank=scorers(s),defenseRank=defenders(s),finished=s.matches.filter(m=>m.status==='finished').length;
- const current=s.matches.find(m=>m.id===selectedMatch),profile=s.players.find(p=>p.id===selectedPlayer);
- const tableView=(limit?:number)=><div className="table-wrap"><table><thead><tr><th>排名</th><th className="align-left">球队</th><th>场次</th>{!limit&&<><th>胜</th><th>平</th><th>负</th><th>进 / 失</th><th>净胜球</th></>}<th>积分</th></tr></thead><tbody>{table.slice(0,limit).map((t,i)=><tr key={t.id}><td><span className={i===0&&finished?'rank first':'rank'}>{String(i+1).padStart(2,'0')}</span></td><td><div className="team-cell"><Badge team={t}/><b>{t.name}</b></div></td><td>{t.played}</td>{!limit&&<><td>{t.win}</td><td>{t.draw}</td><td>{t.loss}</td><td>{t.gf} / {t.ga}</td><td>{t.gd>0?'+':''}{t.gd}</td></>}<td><b className="points">{t.points}</b></td></tr>)}</tbody></table>{!s.teams.length&&<Empty icon={Trophy} title="冠军席位，虚位以待" desc="登记第一支球队，开启积分榜。" action={()=>editTeam()} label="登记球队"/>}</div>;
- const matchCard=(m:Match)=>{const sc=score(m);return <button key={m.id} className="match-card" onClick={()=>{setSelectedMatch(m.id);setPage('matches')}}><div className="match-meta"><span>{m.kind==='pickup'&&<span className="pickup-tag">临时组队</span>}{m.round} <span className="dot-divider">·</span> {dateLabel(m.time)}</span><span className={`status ${m.status}`}>{m.status==='live'?<><i/>进行中</>:m.status==='finished'?'已完赛':'未开赛'}</span></div><div className="versus"><div><Badge team={team(m.homeId)}/><b>{team(m.homeId)?.name}</b></div><strong>{m.status==='scheduled'?<span className="vs">VS</span>:<>{sc[0]} <em>:</em> {sc[1]}</>}</strong><div><Badge team={team(m.awayId)}/><b>{team(m.awayId)?.name}</b></div></div><div className="match-foot"><span>{m.status==='scheduled'?'赛程详情':m.status==='live'?'进入比赛记分':'查看比赛战报'}</span><ArrowUpRight size={15}/></div></button>};
- const exportData=()=>{const blob=new Blob([JSON.stringify({league:s,exportedAt:new Date().toISOString(),version:1},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`G超联赛-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notify('数据快照已导出（头像以链接保存）')};
- return <div className="app-shell"><aside className="sidebar"><button className="brand" onClick={()=>go('overview')} aria-label="G超联赛首页"><span className="brand-g">G<span>★</span></span><span><b>G超联赛</b><small>TABLE FOOTBALL LEAGUE</small></span></button><div className="side-label">赛事中心 <span>LEAGUE CENTER</span></div><nav>{nav.map(n=><button key={n.id} className={`nav-item ${page===n.id?'active':''}`} onClick={()=>go(n.id as Page)}><n.icon size={19}/><span>{n.label}</span>{n.id==='matches'&&live.length>0&&<b className="nav-count">{live.length}</b>}{page===n.id&&<ChevronRight size={15}/>}</button>)}</nav><div className="sidebar-bottom"><div className="mini-pitch"><Goal size={25}/><p>小小球场，大大热爱。</p><span>THE GAME IS ON.</span></div><button className={`nav-item ${page==='settings'?'active':''}`} onClick={()=>go('settings')}><Settings size={18}/><span>联赛设置</span></button><div className="manager"><span>G</span><div><b>联赛管理中心</b><small>每一球，都算数</small></div><span className="manager-dot"/></div></div></aside><div className="main-shell"><header className="topbar"><div className="breadcrumb">赛事中心 <ChevronRight size={13}/><span>{nav.find(n=>n.id===page)?.label||'联赛设置'}</span></div><div className="top-actions"><button className="text-btn" onClick={()=>{if(isAdmin){clearAdmin();setIsAdmin(false);notify('已退出管理')}else{setAuthError('');setAuthOpen(true)}}}>{isAdmin?'退出管理':'管理员登录'}</button><span className={`sync ${online?'':'offline'}`}><i/>{!loaded&&online?'正在连接':online?'实时同步':'连接中断'}</span><span className="season-pill"><CalendarDays size={14}/>{s.settings.season}</span><button className="top-avatar" aria-label="联赛设置" onClick={()=>go('settings')}>G</button></div></header><main>
- {!loaded?<div className="loading-state">{online?<><Loader2 className="spin"/><h2>正在连接赛场…</h2></>:<><Activity/><h2>{apiConfigured?'暂时无法加载联赛':'等待连接联赛数据服务'}</h2><p>{apiConfigured?'请检查网络后重试，数据不会被清空。':'网站页面已就绪，管理员完成数据服务配置后即可使用。'}</p><a href="https://github.com/GSuperLeague/g-super-league#部署" target="_blank" rel="noreferrer">查看部署说明</a><button className="btn primary" onClick={refresh}><RefreshCw size={16}/>重新连接</button></>}</div>:<>
- {!online&&<div className="notice"><Activity size={16}/>同步暂时中断，当前显示上次读取的数据。<button onClick={refresh}>重新连接</button></div>}
- {page==='overview'&&<><div className="page-heading"><div><span className="eyebrow">THE HOME OF TABLE FOOTBALL</span><h1>联赛总览<span className="title-dot">.</span></h1></div><button className="btn primary" onClick={()=>editResult()}><Plus size={17}/>录入赛后比分</button></div><section className="hero"><div className="hero-copy"><div className="hero-label"><span/>G超 · 桌面足球超级联赛</div><h2>每一球，<br/>都<span>算数。</span></h2><p>属于我们的球场，属于每个人的高光。</p><button className="btn lime" onClick={()=>s.teams.length?go('matches'):editTeam()}>{s.teams.length?'进入比赛中心':'登记第一支球队'}<ArrowUpRight size={17}/></button><div className="hero-bottom">PASSION. PRECISION. GLORY.</div></div><Pitch/></section><div className="stat-grid">{[{label:'参赛球队',num:s.teams.length,unit:'支',icon:Shield,sub:'为共同的队徽而战'},{label:'注册球员',num:s.players.length,unit:'位',icon:Users,sub:'每个人都有自己的主场'},{label:'已完成比赛',num:finished,unit:'场',icon:Flag,sub:live.length?`${live.length} 场比赛正在进行`:'下一场精彩，值得期待'},{label:'联赛总进球',num:s.matches.filter(m=>m.status!=='scheduled').reduce((a,m)=>a+score(m)[0]+score(m)[1],0),unit:'球',icon:Goal,sub:'记录每一个破门瞬间'}].map(x=><div className="stat" key={x.label}><div><span>{x.label}</span><x.icon size={19}/></div><strong>{String(x.num).padStart(2,'0')}<small>{x.unit}</small></strong><p>{x.sub}</p></div>)}</div>{(!s.teams.length||!s.players.length||!s.matches.length)&&<section className="onboarding"><div><span className="eyebrow">LET'S GET STARTED</span><h3>联赛，从这里开场</h3><p>三步准备，让热爱正式上场。</p></div><div className="steps">{[{label:'登记球队',sub:'创建队名与专属队徽',done:s.teams.length>0,fn:()=>editTeam()},{label:'添加球员',sub:'完善球员与能力档案',done:s.players.length>0,fn:()=>editPlayer()},{label:'创建比赛',sub:'选好对手，准备开球',done:s.matches.length>0,fn:()=>editMatch()}].map((x,i)=><button key={x.label} onClick={x.fn} className={x.done?'step done':'step'}><span>{x.done?<Check size={16}/>:`0${i+1}`}</span><div><b>{x.label}</b><small>{x.sub}</small></div><ArrowUpRight size={16}/></button>)}</div></section>}<div className="dashboard-grid"><section className="panel"><div className="panel-heading"><h2><span className="section-line"/>球队积分榜</h2><button className="text-btn" onClick={()=>go('table')}>完整榜单<ArrowUpRight size={15}/></button></div>{tableView(5)}<div className="panel-note">胜 {s.settings.win} 分 · 平 {s.settings.draw} 分 · 负 {s.settings.loss} 分 · 完赛后结算</div></section><section className="panel fixtures"><div className="panel-heading"><h2><span className="section-line"/>赛场动态{live.length>0&&<span className="live-tag">LIVE</span>}</h2><button className="text-btn" onClick={()=>go('matches')}>全部赛程<ArrowUpRight size={15}/></button></div>{s.matches.length?<div className="fixture-list">{[...s.matches].sort((a,b)=>(a.status==='live'?-1:0)-(b.status==='live'?-1:0)||new Date(b.time).getTime()-new Date(a.time).getTime()).slice(0,2).map(matchCard)}</div>:<Empty icon={CalendarDays} title="哨声，等待你吹响" desc="完成球队与球员登记，即可安排首场对决。" action={()=>editMatch()} label="创建比赛"/>}</section></div></>}
- {page==='teams'&&<><PageHeading eyebrow="THE CLUBS" title="每支球队，都有故事" desc="组建队伍，找到并肩作战的伙伴。" button="登记球队" action={()=>editTeam()}/><div className="filterbar"><SearchBox query={query} setQuery={setQuery} placeholder="搜索球队名称…"/><span>{s.teams.length} 支参赛球队</span></div>{s.teams.length?<div className="team-grid">{s.teams.filter(t=>t.name.includes(query)).map(t=>{const row=table.find(x=>x.id===t.id)!;const members=s.players.filter(p=>isTeamMember(p,t.id));return <section className="team-card panel" key={t.id}><div className="team-card-top" style={{'--team':t.color} as any}><Badge team={t} size="large"/><div className="card-actions"><button aria-label={`编辑${t.name}`} className="icon-btn" onClick={()=>editTeam(t)}><Pencil size={16}/></button><button aria-label={`删除${t.name}`} className="icon-btn" onClick={()=>confirm('删除球队？','有球员或比赛记录的球队不能删除。',{type:'team.delete',id:t.id})}><Trash2 size={16}/></button></div><span className="team-abbr">{t.short}</span></div><div className="team-card-body"><span className="eyebrow">G SUPER LEAGUE CLUB</span><h2>{t.name}</h2><p>{t.bio||'球队故事，等你来书写。'}</p><div className="team-metrics"><div><b>{members.length}</b><small>球员</small></div><div><b>{row.played}</b><small>已赛</small></div><div><b>{row.points}</b><small>积分</small></div></div><button className="text-btn full" onClick={()=>{go('players');setTeamFilter(t.id)}}>查看球队阵容<ArrowRight size={16}/></button></div></section>})}</div>:<div className="panel"><Empty icon={Shield} title="给你的球队，一个名字" desc="登记队名、简称和主题色，开启 G超联赛之旅。" action={()=>editTeam()} label="登记第一支球队"/></div>}{s.teams.length>0&&!s.teams.some(t=>t.name.includes(query))&&<Empty title="没有找到球队" desc="试试其他搜索关键词。"/>}</>}
- {page==='players'&&!profile&&<><PageHeading eyebrow="THE PLAYERS" title="每一位，都是主角" desc="球员画像、专属身价与六维能力，记录成长的每一步。" button="登记球员" action={()=>editPlayer()}/><div className="filterbar"><SearchBox query={query} setQuery={setQuery} placeholder="搜索姓名或昵称…"/><select aria-label="按球队筛选" value={teamFilter} onChange={e=>setTeamFilter(e.target.value)}><option value="">全部球队</option>{s.teams.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select><span>{s.players.filter(p=>!teamFilter||isTeamMember(p,teamFilter)).length} 位球员</span></div>{s.players.length?<div className="player-grid">{s.players.filter(p=>(!teamFilter||isTeamMember(p,teamFilter))&&`${p.name}${p.nickname}`.includes(query)).map(p=>{const stat=rank.find(r=>r.id===p.id)!;return <article className="player-card" key={p.id} style={{'--team':team(playerTeamIds(p)[0])?.color||'#477260'} as any}><button className="player-card-open" aria-label={`查看 ${p.name} 的球员档案`} onClick={()=>setSelectedPlayer(p.id)}><div className="player-card-visual"><span className="player-number">{String(p.number).padStart(2,'0')}</span><span className="position-label">{p.position}</span><Avatar player={p} large/><Badge team={team(playerTeamIds(p)[0])}/></div><div className="player-card-info"><span className="eyebrow">{playerTeamNames(p)}</span><h2>{p.name}<ArrowUpRight size={18}/></h2><p>{p.nickname||'为热爱上场'}</p><div className="player-card-stats"><div><small>联赛进球</small><b>{stat.goals}<small> 球</small></b></div><div><small>球员身价</small><b>{p.value.toLocaleString()}<small> 万G币</small></b></div></div></div></button><div className="player-card-edit"><button className="text-btn" onClick={()=>editPlayer(p)} aria-label={`编辑 ${p.name} 的资料`}><Pencil size={14}/>编辑资料</button><button className="text-btn" onClick={()=>setSelectedPlayer(p.id)}>查看档案<ArrowUpRight size={14}/></button></div></article>})}</div>:<div className="panel"><Empty icon={UserRound} title="主角，即将登场" desc="先登记球队，再为球员创建第一份专属档案。" action={()=>editPlayer()} label="登记球员"/></div>}{s.players.length>0&&!s.players.some(p=>(!teamFilter||isTeamMember(p,teamFilter))&&`${p.name}${p.nickname}`.includes(query))&&<Empty icon={Users} title="暂无符合条件的球员" desc="调整筛选条件，或为这支球队登记球员。" action={()=>editPlayer()} label="登记球员"/>}</>}
- {page==='players'&&profile&&<><button className="back-btn" onClick={()=>setSelectedPlayer(null)}><ChevronLeft size={17}/>返回球员档案</button><section className="profile-hero"><div className="profile-person"><Avatar player={profile} large/><div><span className="eyebrow">PLAYER PROFILE / #{String(profile.number).padStart(2,'0')}</span><h1>{profile.name}</h1><p>{profile.nickname||'为热爱上场'}</p><div className="profile-tags"><span>{profile.position}</span>{playerTeamIds(profile).map(id=><span key={id}>{team(id)?.name}</span>)}</div></div></div><div className="profile-value"><span>球员身价 · 联赛虚拟估值</span><strong>{profile.value.toLocaleString()}<small>万G币</small></strong><button className="btn secondary" onClick={()=>editPlayer(profile)}><Pencil size={15}/>编辑资料</button></div></section><div className="profile-grid"><section className="panel"><div className="panel-heading"><h2>六维能力图</h2><span className="muted">人工评定 · 0–100</span></div><Radar skills={profile.skills}/><div className="skill-summary">综合能力 <b>{Math.round(profile.skills.reduce((a,b)=>a+b,0)/6)}</b><span> / 100</span></div></section><section className="panel profile-details"><span className="eyebrow">THE STORY & THE STATS</span><h2>关于 {profile.name}</h2><p className="bio">{profile.bio||'还没有球员介绍，点击编辑资料，写下 TA 的打法、特点和故事。'}</p><div className="profile-stats">{[{n:rank.find(p=>p.id===profile.id)?.goals||0,l:'联赛进球'},{n:rank.find(p=>p.id===profile.id)?.forwardGames||0,l:'前锋场次'},{n:rank.find(p=>p.id===profile.id)?.average?.toFixed(2)??'—',l:'场均进球'},{n:signed(defenseRank.find(p=>p.id===profile.id)?.defensiveGoals||0),l:'累计防守球'},{n:defenseRank.find(p=>p.id===profile.id)?.defensiveGames||0,l:'防守场次'},{n:defenseRank.some(p=>p.id===profile.id)?signed(defenseRank.find(p=>p.id===profile.id)!.averageDefense,2):'—',l:'场均防守'}].map(x=><div key={x.l}><b>{x.n}</b><span>{x.l}</span></div>)}</div><p className="help-text">赛后录入的本队进球全部计给本场前锋。场均进球只除以前锋场次；防守球累计每场有正负的分差，再除以后卫场次得到场均防守。不同球队的个人数据合并统计。</p><button className="text-btn danger" onClick={()=>confirm('删除球员档案？','已有比赛记录的球员不可删除，可通过编辑资料调整所属球队。',{type:'player.delete',id:profile.id})}><Trash2 size={14}/>删除档案</button></section></div><section className="panel"><div className="panel-heading"><h2>出场记录</h2></div><div className="match-grid inner">{s.matches.filter(m=>m.homePlayers.includes(profile.id)||m.awayPlayers.includes(profile.id)).map(matchCard)}</div>{!s.matches.some(m=>m.homePlayers.includes(profile.id)||m.awayPlayers.includes(profile.id))&&<Empty icon={CalendarDays} title="等待第一场亮相" desc="创建比赛并选择出场阵容后，比赛记录将显示在这里。"/>}</section></>}
- {page==='table'&&<><PageHeading eyebrow="THE STANDINGS" title="向榜首，进发" desc="每一场较量，都让冠军更近一步。"/><section className="rules-strip"><Trophy size={19}/><b>{s.settings.season}</b><span>胜 {s.settings.win} 分</span><span>平 {s.settings.draw} 分</span><span>负 {s.settings.loss} 分</span><button className="text-btn" onClick={()=>go('settings')}>积分规则<Info size={15}/></button></section><section className="panel">{tableView()}<div className="panel-note">仅统计已完赛的常驻球队比赛；临时组队不参与。依次按积分、净胜球、进球数排序；三项相同按队名字序展示，不代表正式决胜结果。</div></section></>}
- {page==='scorers'&&<><PageHeading eyebrow="THE GOAL GETTERS" title="让进球，替你说话" desc="每一次破门，都值得被铭记。"/><div className="filterbar"><SearchBox query={query} setQuery={setQuery} placeholder="搜索射手姓名…"/><span className="sync"><i/>含进行中比赛 · 自动更新</span></div>{rank.some(p=>p.goals>0)&&<div className="top-scorers">{rank.filter(p=>p.goals>0).slice(0,3).map((p,i)=><button className={`scorer-podium pos-${i}`} key={p.id} onClick={()=>{go('players');setSelectedPlayer(p.id)}}><span className="podium-rank">0{i+1}</span><Avatar player={p}/><div><small>{playerTeamNames(p)}</small><h2>{p.name}</h2></div><strong>{p.goals}<small>进球</small></strong></button>)}</div>}<section className="panel"><div className="table-wrap"><table><thead><tr><th>排名</th><th className="align-left">球员</th><th className="align-left">球队</th><th>前锋场次</th><th>场均进球</th><th>进球数</th></tr></thead><tbody>{rank.filter(p=>p.goals>0&&p.name.includes(query)).map(p=><tr key={p.id}><td><span className="rank">{rank.findIndex(x=>x.id===p.id)+1}</span></td><td><button className="player-table-name" onClick={()=>{go('players');setSelectedPlayer(p.id)}}><Avatar player={p}/><b>{p.name}</b><small>#{p.number}</small></button></td><td className="align-left">{playerTeamNames(p)}</td><td>{p.forwardGames}</td><td>{p.average===null?'—':p.average.toFixed(2)}</td><td><b className="points">{p.goals}</b></td></tr>)}</tbody></table>{!rank.some(p=>p.goals>0)&&<Empty icon={Goal} title="金靴之争，尚未开始" desc="赛后录入最终比分并指定双方前锋后，射手榜会自动生成。" action={()=>go('matches')} label="前往比赛中心"/>}{rank.some(p=>p.goals>0)&&!rank.some(p=>p.goals>0&&p.name.includes(query))&&<Empty title="没有找到射手" desc="试试其他姓名。"/>}</div><div className="panel-note">含常驻队与临时组队比赛。赛后汇总：本队全部进球计给本场前锋。场均进球 = 担任前锋时的进球数 ÷ 前锋场次，不包含后卫场次。旧逐球记录保留总进球，补录本场位置后才参与场均计算；无前锋场次显示 —。进球相同按较少前锋场次优先展示。</div></section></>}
- {page==='defenders'&&<><PageHeading eyebrow="THE DEFENDERS" title="守住胜利，记住贡献" desc="胜负分差如实记录，按后卫出场次数计算场均防守。"/><section className="rules-strip"><Shield size={19}/><b>场均防守 = 累计分差 ÷ 防守场次</b><span>8∶5 → +3 / −3</span><span>平局 → 0 / 0</span></section><div className="filterbar"><SearchBox query={query} setQuery={setQuery} placeholder="搜索后卫姓名…"/><span>仅统计已指定后卫的赛后结果</span></div><section className="panel"><div className="table-wrap"><table><thead><tr><th>排名</th><th className="align-left">球员</th><th className="align-left">所属球队</th><th>防守场次</th><th>场均防守</th><th>累计防守球</th></tr></thead><tbody>{defenseRank.filter(p=>p.name.includes(query)).map(p=><tr key={p.id}><td><span className="rank">{defenseRank.findIndex(x=>x.id===p.id)+1}</span></td><td><button className="player-table-name" onClick={()=>{go('players');setSelectedPlayer(p.id)}}><Avatar player={p}/><b>{p.name}</b><small>#{p.number}</small></button></td><td className="align-left">{playerTeamNames(p)}</td><td>{p.defensiveGames}</td><td>{signed(p.averageDefense,2)}</td><td><b className="points">{signed(p.defensiveGoals)}</b></td></tr>)}</tbody></table>{!defenseRank.length?<Empty icon={Shield} title="后防功勋，等待上榜" desc="录入赛后比分并指定两队后卫，防守榜即可自动生成。" action={()=>editResult()} label="录入赛后比分"/>:!defenseRank.some(p=>p.name.includes(query))&&<Empty icon={Search} title="没有找到后卫" desc="试试其他球员姓名。"/>}</div><div className="panel-note">含常驻队与临时组队比赛。每场防守球 = 本队进球 − 对方进球，胜负分别计正负值，平局记 0。场均防守 = 累计防守球 ÷ 担任后卫的场次，不包含前锋场次。榜单按累计防守球排序，同分依次按较高场均防守、较多防守场次排序。旧的逐球记分比赛需补录赛后结果与后卫后，才计入防守榜。</div></section></>}
- {page==='matches'&&!current&&<><PageHeading eyebrow="MATCH CENTER" title="好戏，即将开场" desc="赛后填写比分，自动结算前锋进球与后卫防守球。" button="录入赛后比分" action={()=>editResult()}/><div className="result-intro"><span><CheckCircle2 size={17}/>不用逐球登记：最终比分 + 双方前锋与后卫，一次完成结算。</span><button className="btn secondary" onClick={()=>editMatch()}><CalendarDays size={15}/>创建赛程</button></div><div className="filterbar"><div className="tabs">{[{id:'all',t:'全部比赛'},{id:'live',t:'进行中'},{id:'scheduled',t:'未开赛'},{id:'finished',t:'已完赛'}].map(x=><button key={x.id} onClick={()=>setMatchFilter(x.id)} className={matchFilter===x.id?'active':''}>{x.t}{x.id==='live'&&live.length>0&&<span>{live.length}</span>}</button>)}</div><span>共 {s.matches.length} 场比赛</span></div>{s.matches.filter(m=>matchFilter==='all'||m.status===matchFilter).length?<div className="match-grid">{[...s.matches].filter(m=>matchFilter==='all'||m.status===matchFilter).sort((a,b)=>new Date(b.time).getTime()-new Date(a.time).getTime()).map(matchCard)}</div>:<section className="panel"><Empty icon={CalendarDays} title={s.matches.length?'这个分组还没有比赛':'第一场对决，由你安排'} desc="选择双方球队、前锋和后卫，填写已经结束的比赛比分。" action={()=>editResult()} label="录入赛后比分"/></section>}</>}
- {page==='matches'&&current&&<><button className="back-btn" onClick={()=>setSelectedMatch(null)}><ChevronLeft size={17}/>返回赛程中心</button><section className="scoreboard"><div className="scoreboard-top"><span>{current.kind==='pickup'?'临时组队 · ':''}{current.round} · {dateLabel(current.time)}（北京时间）</span><span className={`status ${current.status}`}>{current.status==='live'?<><i/>正在比赛</>:current.status==='finished'?'全场结束':'即将开赛'}</span></div><div className="big-score"><div><Badge team={team(current.homeId)} size="large"/><h2>{team(current.homeId)?.name}</h2><span>主队</span></div><strong>{score(current)[0]}<em>:</em>{score(current)[1]}</strong><div><Badge team={team(current.awayId)} size="large"/><h2>{team(current.awayId)?.name}</h2><span>客队</span></div></div><div className="scoreboard-actions"><button className="btn lime" onClick={()=>editResult(current)}><Pencil size={16}/>{current.summary?'编辑赛后结果':'录入最终比分'}</button>{!current.summary&&(current.status==='scheduled'?<><button disabled={busy} className="btn lime" onClick={()=>mutate({type:'match.start',id:current.id},false)}><Play size={16}/>开始比赛</button><button className="btn ghost" onClick={()=>editMatch(current)}><Pencil size={15}/>编辑赛程</button></>:current.status==='live'?<><button className="btn lime" onClick={()=>setDialog({kind:'goal',data:{match:current,teamId:current.homeId}})}><Plus size={17}/>主队进球</button><button className="btn lime" onClick={()=>setDialog({kind:'goal',data:{match:current,teamId:current.awayId}})}><Plus size={17}/>客队进球</button><button className="btn ghost" onClick={()=>confirm('确认结束本场比赛？','完赛后结果立即计入球队积分榜。需要纠错时，可重新打开比赛。',{type:'match.finish',id:current.id})}><Flag size={16}/>结束比赛</button></>:<button className="btn ghost" onClick={()=>confirm('重新打开比赛？','本场结果将暂时从积分榜移除。修正进球后，请再次结束比赛。',{type:'match.reopen',id:current.id})}><Undo2 size={16}/>重新打开 / 修正比分</button>)}</div></section><div className="match-scope-note">{current.kind==='pickup'?'本场为队伍A / 队伍B临时组队，仅计入个人射手榜与防守榜，不计入常驻球队积分榜。':'本场为常驻球队比赛，完赛后计入球队积分榜；赛后结果同时结算个人榜单。'}</div><div className="match-detail-grid"><section className="panel"><div className="panel-heading"><h2>{current.summary?'赛后结算':'进球时间线'}</h2><span className="muted">{score(current)[0]+score(current)[1]} 粒进球</span></div>{current.summary?<div className="settlement-list">{[{teamId:current.homeId,forward:current.summary.homeForwardId,defender:current.summary.homeDefenderId,goals:current.summary.homeScore,defense:(current.summary.homeScore-current.summary.awayScore)},{teamId:current.awayId,forward:current.summary.awayForwardId,defender:current.summary.awayDefenderId,goals:current.summary.awayScore,defense:(current.summary.awayScore-current.summary.homeScore)}].map(x=><div className="settlement-team" key={x.teamId}><h3><Badge team={team(x.teamId)}/>{team(x.teamId)?.name}</h3><div><span>前锋 · {player(x.forward)?.name}</span><b>{x.goals}<small> 进球</small></b></div><div><span>后卫 · {player(x.defender)?.name}</span><b>{signed(x.defense)}<small> 防守球</small></b></div></div>)}<p className="help-text">赛后汇总不记录逐球时间。防守球 = 本队进球 − 对方进球；榜单再除以个人防守场次得到场均防守。</p></div>:current.goals.length?<div className="timeline">{current.goals.map((g,i)=><div className="goal-event" key={g.id}><span className="event-minute">{g.minute}′</span><span className="event-ball"><Goal size={19}/></span><div><b>{g.playerId?player(g.playerId)?.name||'已归档球员':'未指定球员'}{g.ownGoal&&<span className="og-label">乌龙球</span>}</b><small>{team(g.teamId)?.name} 得分</small></div><strong>{current.goals.slice(0,i+1).filter(e=>e.teamId===current.homeId).length} : {current.goals.slice(0,i+1).filter(e=>e.teamId===current.awayId).length}</strong>{current.status==='live'&&<button className="icon-btn" aria-label={`撤销第${i+1}个进球`} onClick={()=>confirm('撤销这粒进球？','比分和射手榜将同步扣除该记录。',{type:'goal.delete',id:current.id,goalId:g.id})}><Undo2 size={15}/></button>}</div>)}</div>:<Empty icon={Goal} title="等待第一粒进球" desc="开始比赛后，点击主队或客队进球并选择进球队员。"/>}</section><section className="panel roster"><div className="panel-heading"><h2>本场出场阵容</h2></div>{[current.homeId,current.awayId].map((id,i)=><div className="roster-team" key={id}><h3><Badge team={team(id)}/>{team(id)?.name}</h3>{(i===0?current.homePlayers:current.awayPlayers).map(pid=>{const p=player(pid);return p?<button key={pid} className="roster-player" onClick={()=>{go('players');setSelectedPlayer(pid)}}><Avatar player={p}/><b>{p.name}</b><span>{current.summary?(p.id===current.summary.homeForwardId||p.id===current.summary.awayForwardId?'本场前锋':'本场后卫'):p.position}</span><small>#{p.number}</small></button>:null})}</div>)}</section></div><div className="delete-match"><span>误建的比赛可以删除，相关比分和个人进球也将一并移除。</span><button className="text-btn danger" onClick={()=>confirm('永久删除这场比赛？','本场比分、出场和进球记录将全部移除，榜单也会重新计算。此操作无法撤销。',{type:'match.delete',id:current.id})}><Trash2 size={14}/>删除比赛</button></div></>}
- {page==='settings'&&<><PageHeading eyebrow="LEAGUE SETTINGS" title="你的联赛，你来定义" desc="设置赛季名称与积分规则，做好每一场比赛的准备。"/><div className="settings-grid"><section className="panel settings-panel"><h2>赛季与积分规则</h2><p className="muted">修改规则后，所有已完赛比赛会重新计算积分。</p><form onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);mutate({type:'settings.save',id:'settings',data:{season:f.get('season'),win:Number(f.get('win')),draw:Number(f.get('draw')),loss:Number(f.get('loss'))}},false)}} key={JSON.stringify(s.settings)}><label>赛季名称<input name="season" defaultValue={s.settings.season} maxLength={30} required/></label><div className="form-grid three">{[{n:'win',l:'获胜积分'},{n:'draw',l:'平局积分'},{n:'loss',l:'失利积分'}].map(x=><label key={x.n}>{x.l}<input type="number" min="0" max="10" name={x.n} defaultValue={s.settings[x.n as 'win']} required/></label>)}</div><p className="help-text">赛季名称仅为标签，修改不会清空已有比赛。积分相同依次比较净胜球、进球数。</p><button className="btn primary" disabled={busy}>{busy?<Loader2 size={16} className="spin"/>:<Check size={16}/>}保存规则</button></form></section><div><section className="panel settings-panel"><Download size={25}/><h2>导出联赛数据</h2><p>导出球队、球员、比赛、进球及积分设置的 JSON 快照。头像以链接保留。</p><button className="btn secondary" onClick={exportData}><Download size={16}/>导出数据快照</button></section><section className="panel settings-panel about"><span className="eyebrow">HOW IT WORKS</span><h2>记分说明</h2><ul><li>球员可加入多个球队，在球员卡片或档案页点击“编辑资料”修改。</li><li>每队每场可登记 1–4 位出场球员；同一场比赛中，每位球员只能代表一方。</li><li>临时组队自由选择所有已登记球员，固定显示队伍A / 队伍B，只计个人射手榜、防守榜，不影响常驻球队积分。</li><li>赛后可直接填写最终比分，指定双方固定前锋和后卫，保存即完赛。</li><li>本队全部进球计给本场前锋。防守球按每场有正负的分差计给后卫：8∶5 记 +3 和 −3，平局记 0。场均防守 = 累计防守球 ÷ 后卫场次；场均进球 = 前锋进球 ÷ 前锋场次。</li><li>积分榜、射手榜、防守榜随结果自动结算；其他页面每 3 秒同步。</li><li>球队积分仅在比赛结束后结算。</li><li>身价使用虚拟 G币，六维能力由管理者手动评定，不会因比赛自动改变。</li><li>所有访客可查看联赛数据；管理员登录后可登记、录入和维护。</li></ul></section></div></div></>}
- <footer className="footer"><span><b>G超联赛</b> · 每一球，都算数。</span><span>BUILT FOR THE LOVE OF THE GAME <span className="footer-dot">●</span></span></footer></>}
- </main></div>{toast&&<div className="toast" role="status"><Info size={18}/><span>{toast}</span><button onClick={()=>setToast('')} aria-label="关闭提示"><X size={15}/></button></div>}
- {authOpen&&<Modal title="管理员登录" onClose={()=>setAuthOpen(false)}><form className="entity-form" onSubmit={async e=>{e.preventDefault();setAuthError('');const f=new FormData(e.currentTarget);try{await loginAdmin(String(f.get('token')));setIsAdmin(true);setAuthOpen(false);notify('管理员已登录')}catch(e){setAuthError(e instanceof Error?e.message:'登录失败')}}}><p className="help-text">输入联赛管理员提供的管理密钥。本次登录仅在当前标签页保留。</p><label>管理密钥<input name="token" type="password" autoComplete="current-password" required/></label>{authError&&<p role="alert">{authError}</p>}<button className="btn primary" disabled={!apiConfigured}>登录</button></form></Modal>}
- {dialog?.kind==='team' &&<Modal title={dialog.data?'编辑球队':'登记一支新球队'} onClose={close}><TeamForm initial={dialog.data} busy={busy} onSave={data=>mutate({type:'team.save',id:dialog.data?.id||uid(),data})}/></Modal>}
- {dialog?.kind==='player'&&<Modal title={dialog.data?'编辑球员档案':'登记一位新球员'} onClose={close} wide><PlayerForm initial={dialog.data} teams={s.teams} busy={busy} onError={notify} onSave={data=>mutate({type:'player.save',id:dialog.data?.id||uid(),data})}/></Modal>}
- {dialog?.kind==='match'&&<Modal title={dialog.data?'编辑比赛赛程':'创建一场新比赛'} onClose={close} wide><MatchForm initial={dialog.data} teams={s.teams} players={s.players} busy={busy} onSave={data=>mutate({type:'match.save',id:dialog.data?.id||uid(),data})}/></Modal>}
- {dialog?.kind==='result'&&<Modal title={dialog.data?'录入 / 编辑赛后结果':'录入赛后比分'} onClose={close} wide><ResultForm initial={dialog.data} teams={s.teams} players={s.players} busy={busy} onSave={async data=>{const id=dialog.data?.id||data.resultId;const ok=await mutate({type:'match.result',id,data});if(ok){setPage('matches');setSelectedMatch(id)}}}/></Modal>}
- {dialog?.kind==='goal'&&<Modal title="记录进球瞬间" onClose={close}><GoalForm match={s.matches.find(m=>m.id===dialog.data.match.id)||dialog.data.match} teamId={dialog.data.teamId} teams={s.teams} players={s.players} busy={busy} onSave={data=>mutate({type:'goal.add',id:dialog.data.match.id,data})}/></Modal>}
- {dialog?.kind==='confirm'&&<Modal title={dialog.data.title} onClose={close}><div className="confirm-content"><p>{dialog.data.desc}</p><div className="form-footer"><button className="btn secondary" onClick={close}>取消</button><button className="btn primary" disabled={busy} onClick={()=>mutate(dialog.data.action)}>{busy?'正在保存…':'确认操作'}</button></div></div></Modal>}
- </div>
+import {
+  EloLeaders,
+  PlayerDirectory,
+  PlayerProfile,
+  AnalyticsPage,
+  MatchElo,
+} from "./Analytics";
+import {
+  apiFetch,
+  apiConfigured,
+  photoUrl,
+  adminToken,
+  clearAdmin,
+  loginAdmin,
+} from "./api";
+import { useState, useEffect, useRef, useCallback, ReactNode } from "react";
+import {
+  ArrowUpRight,
+  ArrowRight,
+  Plus,
+  LayoutDashboard,
+  BarChart3,
+  CalendarDays,
+  Trophy,
+  Goal,
+  Users,
+  Shield,
+  Settings,
+  ChevronRight,
+  ChevronLeft,
+  Search,
+  X,
+  Check,
+  Flag,
+  Pencil,
+  Trash2,
+  Upload,
+  Download,
+  RefreshCw,
+  Info,
+  Activity,
+  UserRound,
+  CheckCircle2,
+  Loader2,
+  Undo2,
+  Play,
+  Target,
+} from "lucide-react";
+import {
+  League,
+  Team,
+  Player,
+  Match,
+  emptyLeague,
+  standings,
+  score,
+  dimensions,
+  playerTeamIds,
+  isTeamMember,
+  matchTeam,
+} from "@/lib/league";
+type Page =
+  | "overview"
+  | "matches"
+  | "table"
+  | "analytics"
+  | "players"
+  | "teams"
+  | "settings";
+type Dialog = { kind: string; data?: any };
+const nav = [
+  { id: "overview", label: "联赛总览", icon: LayoutDashboard },
+  { id: "matches", label: "赛程与比分", icon: CalendarDays },
+  { id: "table", label: "球队积分榜", icon: Trophy },
+  { id: "analytics", label: "赛场数据", icon: BarChart3 },
+  { id: "players", label: "球员档案", icon: Users },
+  { id: "teams", label: "球队管理", icon: Shield },
+];
+const uid = () => crypto.randomUUID();
+const signed = (value: number, digits = 0) => {
+  const rounded = Number(value.toFixed(digits));
+  return `${rounded > 0 ? "+" : ""}${rounded.toFixed(digits)}`;
+};
+const dateLabel = (t: string) =>
+  new Date(t).toLocaleString("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+const dateInput = (t?: string) =>
+  new Date(t || Date.now())
+    .toLocaleString("sv-SE", { timeZone: "Asia/Shanghai" })
+    .slice(0, 16)
+    .replace(" ", "T");
+function Badge({ team, size = "normal" }: { team?: Team; size?: string }) {
+  return (
+    <span
+      className={`badge ${size}`}
+      style={{ "--team": team?.color || "#638276" } as any}
+    >
+      <Shield size={size === "large" ? 38 : 23} strokeWidth={1.4} />
+      <b>{team?.short?.slice(0, 2) || "G"}</b>
+    </span>
+  );
 }
-function PageHeading({eyebrow,title,desc,button,action}:{eyebrow:string;title:string;desc?:string;button?:string;action?:()=>void}){return <div className="page-heading"><div><span className="eyebrow">{eyebrow}</span><h1>{title}<span className="title-dot">.</span></h1>{desc&&<p>{desc}</p>}</div>{button&&<button className="btn primary" onClick={action}><Plus size={17}/>{button}</button>}</div>}
-function SearchBox({query,setQuery,placeholder}:{query:string;setQuery:(s:string)=>void;placeholder:string}){return <div className="searchbox"><Search size={17}/><input aria-label={placeholder} placeholder={placeholder} value={query} onChange={e=>setQuery(e.target.value)}/>{query&&<button aria-label="清空搜索" onClick={()=>setQuery('')}><X size={14}/></button>}</div>}
-function TeamForm({initial,busy,onSave}:{initial?:Team;busy:boolean;onSave:(d:any)=>void}){const [color,setColor]=useState(initial?.color||'#365c49'),[name,setName]=useState(initial?.name||''),[short,setShort]=useState(initial?.short||'');return <form className="entity-form" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);onSave({name,short,color,bio:f.get('bio')})}}><div className="team-preview"><Badge team={{id:'',name,short:short||'G',color,bio:''}} size="large"/><div><b>{name||'你的球队名称'}</b><span>专属颜色，专属队徽。</span></div></div><div className="form-grid"><label>球队名称 <em>*</em><input value={name} onChange={e=>setName(e.target.value)} required maxLength={24} placeholder="例如：旋风队"/></label><label>球队简称 <em>*</em><input value={short} onChange={e=>setShort(e.target.value)} required maxLength={4} placeholder="例如：XF"/></label></div><label>球队主题色</label><div className="color-options">{['#365c49','#275e9b','#b85143','#78519a','#cf9937','#324052'].map(c=><button key={c} type="button" aria-label={`选择颜色 ${c}`} className={c===color?'selected':''} style={{background:c}} onClick={()=>setColor(c)}>{c===color&&<Check size={17}/>}</button>)}<input aria-label="自定义球队颜色" type="color" value={color} onChange={e=>setColor(e.target.value)}/></div><label>球队介绍<textarea name="bio" defaultValue={initial?.bio||''} maxLength={300} rows={3} placeholder="写一句球队口号，或介绍你们的故事…"/></label><div className="form-footer"><span className="help-text">保存后可继续添加球队球员。</span><button className="btn primary" disabled={busy}>{busy?'保存中…':initial?'保存修改':'完成登记'}<ArrowRight size={16}/></button></div></form>}
-function PlayerForm({initial,teams,busy,onSave,onError}:{initial?:Player;teams:Team[];busy:boolean;onSave:(d:any)=>void;onError:(m:string)=>void}){const [teamIds,setTeamIds]=useState<string[]>(initial?playerTeamIds(initial):teams[0]?[teams[0].id]:[]);const [skills,setSkills]=useState(initial?.skills||[50,50,50,50,50,50]),[photo,setPhoto]=useState(initial?.photo||''),[uploading,setUploading]=useState(false);const upload=async(file:File)=>{if(!/^image\/(jpeg|png|webp)$/.test(file.type)){onError('请选择 JPG、PNG 或 WebP 图片');return}if(file.size>10*1024*1024){onError('原图请小于 10MB');return}setUploading(true);try{const bitmap=await createImageBitmap(file);const canvas=document.createElement('canvas');const ratio=Math.min(1,512/Math.max(bitmap.width,bitmap.height));canvas.width=bitmap.width*ratio;canvas.height=bitmap.height*ratio;canvas.getContext('2d')!.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close();const blob=await new Promise<Blob>((res,rej)=>canvas.toBlob(x=>x?res(x):rej(Error()),'image/jpeg',.85));const r=await apiFetch('/api/photos',{method:'POST',body:blob});const b:any=await r.json();if(!r.ok)throw Error(b.error);setPhoto(b.url)}catch{onError('头像上传失败，请重试')}finally{setUploading(false)}};return <form className="entity-form" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);onSave({name:f.get('name'),nickname:f.get('nickname'),teamIds,number:Number(f.get('number')),position:f.get('position'),value:Number(f.get('value')),bio:f.get('bio'),photo,skills})}}><div className="photo-upload"><span className="upload-avatar">{photo?<img src={photoUrl(photo)} alt="头像预览"/>:<UserRound size={32}/>}</span><div><label className="btn secondary upload-button"><Upload size={15}/>{uploading?'上传中…':'上传球员头像'}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading} onChange={e=>{if(e.target.files?.[0])upload(e.target.files[0])}}/></label><p className="help-text">JPG / PNG / WebP，原图不超过 10MB</p>{photo&&<button type="button" className="text-btn" onClick={()=>setPhoto('')}>移除头像</button>}</div></div><div className="form-grid"><label>球员姓名 <em>*</em><input name="name" defaultValue={initial?.name} maxLength={30} required placeholder="球员姓名"/></label><label>昵称<input name="nickname" defaultValue={initial?.nickname} maxLength={30} placeholder="球场上的专属称号"/></label><fieldset className="membership-field"><legend>所属球队（可多选） <em>*</em></legend><p className="help-text">至少选择一支球队；同一球员可代表不同球队参加不同比赛。</p><div className="membership-options">{teams.map(t=><label className="membership-option" key={t.id}><input type="checkbox" checked={teamIds.includes(t.id)} onChange={e=>setTeamIds(e.target.checked?[...teamIds,t.id]:teamIds.filter(id=>id!==t.id))}/><Badge team={t}/><span>{t.name}</span></label>)}</div>{teamIds.length===0&&<p className="help-text membership-error">请选择至少一支球队。</p>}</fieldset><label>球衣号码 <em>*</em><input name="number" type="number" min="0" max="99" defaultValue={initial?.number??1} required/></label><label>场上位置<select name="position" defaultValue={initial?.position||'全能型'}>{['前锋','后卫','守门员','全能型'].map(p=><option key={p}>{p}</option>)}</select></label><label>身价（万G币）<input name="value" type="number" min="0" max="1000000" step="0.1" defaultValue={initial?.value??0} required/></label></div><div className="ability-editor"><div><h3>六维能力</h3><p className="help-text">手动评定，范围 0–100。新球员默认值 50 可调整；身价为联赛虚拟估值。</p><div className="sliders">{dimensions.map((d,i)=><label key={d}><span>{d}</span><input type="range" min="0" max="100" value={skills[i]} onChange={e=>setSkills(skills.map((v,j)=>i===j?Number(e.target.value):v))}/><b>{skills[i]}</b></label>)}</div></div><Radar skills={skills} small/></div><label>球员画像 / 个人介绍<textarea name="bio" defaultValue={initial?.bio} rows={3} maxLength={500} placeholder="擅长的打法、招牌动作、球场性格…"/></label><div className="form-footer"><span className="help-text">所属球队可多选；修改资料不会改变历史比赛的出场与进球归属。</span><button className="btn primary" disabled={busy||uploading||teamIds.length===0}>{busy?'保存中…':'保存球员档案'}<Check size={16}/></button></div></form>}
-function MatchKindPicker({kind,onChange,locked=false}:{kind:'regular'|'pickup';onChange:(kind:'regular'|'pickup')=>void;locked?:boolean}){return <div className="match-kind-picker"><div role="group" aria-label="比赛组队方式"><button type="button" disabled={locked} aria-pressed={kind==='regular'} className={kind==='regular'?'selected':''} onClick={()=>onChange('regular')}><Trophy size={17}/><span><b>常驻队比赛</b><small>计入球队积分与个人榜单</small></span></button><button type="button" disabled={locked} aria-pressed={kind==='pickup'} className={kind==='pickup'?'selected':''} onClick={()=>onChange('pickup')}><Users size={17}/><span><b>临时组队</b><small>队伍A / 队伍B · 仅计个人榜单</small></span></button></div>{kind==='pickup'&&<p>可从全部球员中自由混搭，不改变球员的常驻球队归属。</p>}</div>}
-function MatchForm({initial,teams,players,busy,onSave}:{initial?:Match;teams:Team[];players:Player[];busy:boolean;onSave:(d:any)=>void}){
- const [kind,setKind]=useState<'regular'|'pickup'>(initial?.kind||(teams.length>=2?'regular':'pickup'));
- const [home,setHome]=useState(initial?.homeId||teams[0]?.id||''),[away,setAway]=useState(initial?.awayId||teams[1]?.id||''),[homePlayers,setHomePlayers]=useState<string[]>(initial?.homePlayers||[]),[awayPlayers,setAwayPlayers]=useState<string[]>(initial?.awayPlayers||[]);
- return <form className="entity-form" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);onSave({kind,homeId:home,awayId:away,homePlayers,awayPlayers,time:new Date(`${f.get('time')}:00+08:00`).toISOString(),round:f.get('round')})}}><MatchKindPicker kind={kind} locked={!!initial} onChange={k=>{setKind(k);setHomePlayers([]);setAwayPlayers([])}}/><div className="form-grid"><label>轮次 / 比赛名称 <em>*</em><input name="round" defaultValue={initial?.round||'友谊对决'} maxLength={30} required/></label><label>比赛时间（北京时间） <em>*</em><input type="datetime-local" name="time" defaultValue={dateInput(initial?.time)} required/></label></div><div className="form-grid roster-select">{[{label:kind==='pickup'?'队伍A':'主队',value:home,set:setHome,other:away,selected:homePlayers,setSelected:setHomePlayers,opposite:awayPlayers},{label:kind==='pickup'?'队伍B':'客队',value:away,set:setAway,other:home,selected:awayPlayers,setSelected:setAwayPlayers,opposite:homePlayers}].map(x=><div key={x.label}>{kind==='pickup'?<div className="pickup-team-name">{x.label}<span>本场临时阵容</span></div>:<label>{x.label} <em>*</em><select value={x.value} onChange={e=>{x.set(e.target.value);x.setSelected([])}} required><option value="">选择常驻球队</option>{teams.map(t=><option key={t.id} value={t.id} disabled={t.id===x.other}>{t.name}</option>)}</select></label>}<p className="help-text">选择出场球员（1–4 人）</p><div className="roster-options">{players.filter(p=>kind==='pickup'||isTeamMember(p,x.value)).map(p=><label className="check-player" key={p.id}><input type="checkbox" disabled={x.opposite.includes(p.id)} checked={x.selected.includes(p.id)} onChange={e=>x.setSelected(e.target.checked?[...x.selected,p.id]:x.selected.filter(id=>id!==p.id))}/><Avatar player={p}/><span>{p.name}{x.opposite.includes(p.id)&&<small className="opponent-note">已代表对方出场</small>}</span><small>#{p.number}</small></label>)}{!players.some(p=>kind==='pickup'||isTeamMember(p,x.value))&&<p className="help-text">暂无可选球员，请先登记球员。</p>}</div></div>)}</div><div className="form-footer"><span className="help-text">同一场比赛，每位球员只能代表一方出场。</span><button className="btn primary" disabled={busy||(kind==='regular'&&(!home||!away||home===away))||homePlayers.length<1||awayPlayers.length<1||homePlayers.length>4||awayPlayers.length>4||homePlayers.some(id=>awayPlayers.includes(id))}>{busy?'保存中…':initial?'保存赛程':'创建比赛'}<ArrowRight size={16}/></button></div></form>
+function Avatar({
+  player,
+  large = false,
+}: {
+  player: Player;
+  large?: boolean;
+}) {
+  return (
+    <span className={`avatar ${large ? "avatar-large" : ""}`}>
+      {player.photo ? (
+        <img src={photoUrl(player.photo)} alt={`${player.name}头像`} />
+      ) : (
+        <span>{player.name.slice(-2)}</span>
+      )}
+    </span>
+  );
 }
-function GoalForm({match,teamId,teams,players,busy,onSave}:{match:Match;teamId:string;teams:Team[];players:Player[];busy:boolean;onSave:(d:any)=>void}){const [ownGoal,setOwnGoal]=useState(false),[playerId,setPlayerId]=useState(''),[id]=useState(uid);const ids=(teamId===match.homeId)!==ownGoal?match.homePlayers:match.awayPlayers;return <form className="entity-form" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);onSave({id,teamId,playerId,ownGoal,minute:Number(f.get('minute'))})}}><div className="goal-form-team"><Badge team={matchTeam(teams,match,teamId)}/><span><b>{matchTeam(teams,match,teamId)?.name}</b> 获得 1 分</span></div><label className="checkbox-label"><input type="checkbox" checked={ownGoal} onChange={e=>{setOwnGoal(e.target.checked);setPlayerId('')}}/>这是对方乌龙球</label><label>{ownGoal?'乌龙球球员（对方）':'进球球员'}<select value={playerId} onChange={e=>setPlayerId(e.target.value)} required={ownGoal}><option value="">{ownGoal?'请选择对方球员':'暂不指定球员'}</option>{players.filter(p=>ids.includes(p.id)).map(p=><option key={p.id} value={p.id}>#{p.number} {p.name}</option>)}</select></label><label>进球发生于第几分钟<input name="minute" type="number" min="0" max="999" defaultValue={match.goals.at(-1)?.minute||0} required/></label><p className="help-text">未指定球员时只计入球队比分。乌龙球不计入个人射手榜。记错后可在时间线撤销并重新登记。</p><div className="form-footer"><span>比分与射手榜将同步更新</span><button className="btn primary" disabled={busy}>{busy?'正在记分…':'确认进球'}<Goal size={16}/></button></div></form>}
+function Radar({
+  skills,
+  small = false,
+}: {
+  skills: number[];
+  small?: boolean;
+}) {
+  const xy = (r: number, i: number) =>
+    `${150 + Math.sin((i * Math.PI) / 3) * r},${138 - Math.cos((i * Math.PI) / 3) * r}`;
+  return (
+    <svg
+      role="img"
+      aria-label={`六维能力：${dimensions.map((n, i) => `${n} ${skills[i]}`).join("，")}`}
+      viewBox="0 0 300 285"
+      className={`radar ${small ? "radar-small" : ""}`}
+    >
+      {[0.25, 0.5, 0.75, 1].map((r) => (
+        <polygon
+          key={r}
+          points={dimensions.map((_, i) => xy(96 * r, i)).join(" ")}
+          fill="none"
+          stroke="currentColor"
+          opacity=".15"
+        />
+      ))}
+      {dimensions.map((_, i) => (
+        <line
+          key={i}
+          x1="150"
+          y1="138"
+          x2={xy(96, i).split(",")[0]}
+          y2={xy(96, i).split(",")[1]}
+          stroke="currentColor"
+          opacity=".12"
+        />
+      ))}
+      <polygon
+        points={skills.map((v, i) => xy(v * 0.96, i)).join(" ")}
+        fill="#8fba45"
+        fillOpacity=".23"
+        stroke="#6d912d"
+        strokeWidth="2"
+      />
+      {skills.map((v, i) => (
+        <circle
+          key={i}
+          cx={xy(v * 0.96, i).split(",")[0]}
+          cy={xy(v * 0.96, i).split(",")[1]}
+          r="3"
+          fill="#719b30"
+        />
+      ))}
+      {dimensions.map((d, i) => (
+        <text
+          key={d}
+          x={xy(123, i).split(",")[0]}
+          y={Number(xy(123, i).split(",")[1]) + 4}
+          textAnchor="middle"
+          fontSize="11"
+          fill="currentColor"
+        >
+          {d} {skills[i]}
+        </text>
+      ))}
+    </svg>
+  );
+}
+function Pitch() {
+  return (
+    <div className="pitch-art" aria-hidden="true">
+      <span className="pitch-word">
+        G SUPER
+        <br />
+        LEAGUE
+      </span>
+      <svg viewBox="0 0 580 360">
+        <defs>
+          <linearGradient id="field" x1="0" x2="1" y1="0" y2="1">
+            <stop stopColor="#3b6553" />
+            <stop offset="1" stopColor="#214336" />
+          </linearGradient>
+          <linearGradient id="rod">
+            <stop stopColor="#d7dfcf" />
+            <stop offset=".5" stopColor="#819988" />
+            <stop offset="1" stopColor="#c2cdbb" />
+          </linearGradient>
+        </defs>
+        <g transform="translate(90 50) rotate(-15 200 125) skewX(12)">
+          <rect x="-12" y="8" width="410" height="265" rx="11" fill="#142d24" />
+          <rect
+            x="-12"
+            y="-7"
+            width="410"
+            height="265"
+            rx="11"
+            fill="#567359"
+          />
+          <rect width="385" height="244" rx="5" fill="url(#field)" />
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <rect
+              key={i}
+              x={i * 64}
+              width="32"
+              height="244"
+              fill="#fff"
+              opacity=".025"
+            />
+          ))}
+          <g stroke="#c6d9a9" strokeWidth="1.5" opacity=".45" fill="none">
+            <rect x="16" y="15" width="354" height="214" />
+            <path d="M193 15v214" />
+            <circle cx="193" cy="122" r="39" />
+            <path d="M16 68h54v108H16M370 68h-54v108h54M16 94h20v55H16M370 94h-20v55h20" />
+          </g>
+          {[42, 119, 265, 343].map((x, i) => (
+            <g key={x}>
+              <rect
+                x={x - 2}
+                y="-32"
+                width="5"
+                height="308"
+                rx="2"
+                fill="url(#rod)"
+              />
+              <rect
+                x={x - 7}
+                y={i < 2 ? 249 : -46}
+                width="15"
+                height="42"
+                rx="4"
+                fill="#13281f"
+              />
+              {(i === 0 || i === 3 ? [122] : [65, 178]).map((y) => (
+                <g key={y}>
+                  <rect
+                    x={x - 10}
+                    y={y + 8}
+                    width="28"
+                    height="10"
+                    rx="3"
+                    fill="#102a1e"
+                    opacity=".35"
+                  />
+                  <rect
+                    x={x - 10}
+                    y={y - 4}
+                    width="20"
+                    height="15"
+                    rx="4"
+                    fill={i < 2 ? "#d2f492" : "#e9e9d5"}
+                  />
+                  <rect
+                    x={x - 6}
+                    y={y + 7}
+                    width="12"
+                    height="17"
+                    rx="3"
+                    fill={i < 2 ? "#a4c962" : "#bcc5b1"}
+                  />
+                  <circle
+                    cx={x}
+                    cy={y - 6}
+                    r="7"
+                    fill={i < 2 ? "#d6f7a0" : "#fffdeb"}
+                  />
+                </g>
+              ))}
+            </g>
+          ))}
+          <circle cx="218" cy="154" r="7" fill="#fff9d6" />
+          <circle cx="220" cy="157" r="7" fill="#11281e" opacity=".15" />
+        </g>
+      </svg>
+      <span className="pitch-coordinate">120 × 70 CM · 无限可能</span>
+    </div>
+  );
+}
+function Empty({
+  icon: Icon = Flag,
+  title,
+  desc,
+  action,
+  label,
+}: {
+  icon?: any;
+  title: string;
+  desc: string;
+  action?: () => void;
+  label?: string;
+}) {
+  return (
+    <div className="empty">
+      <span className="empty-icon">
+        <Icon size={27} strokeWidth={1.3} />
+      </span>
+      <h3>{title}</h3>
+      <p>{desc}</p>
+      {action && (
+        <button className="btn secondary" onClick={action}>
+          {label}
+          <ArrowUpRight size={15} />
+        </button>
+      )}
+    </div>
+  );
+}
+function Modal({
+  title,
+  children,
+  onClose,
+  wide = false,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+  wide?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const old = document.activeElement as HTMLElement;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    ref.current?.focus();
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "Tab") {
+        const els = ref.current?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]',
+        );
+        if (!els?.length) return;
+        const first = els[0],
+          last = els[els.length - 1];
+        if (
+          e.shiftKey &&
+          (document.activeElement === first ||
+            document.activeElement === ref.current)
+        ) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", handler);
+      old?.focus();
+    };
+  }, [onClose]);
+  return (
+    <div
+      className="modal-backdrop"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className={`modal ${wide ? "wide" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        ref={ref}
+      >
+        <header>
+          <div>
+            <span className="eyebrow">G SUPER LEAGUE</span>
+            <h2>{title}</h2>
+          </div>
+          <button aria-label="关闭" className="icon-btn" onClick={onClose}>
+            <X size={21} />
+          </button>
+        </header>
+        {children}
+      </div>
+    </div>
+  );
+}
+export default function Home() {
+  const [s, setS] = useState<League>(emptyLeague),
+    [loaded, setLoaded] = useState(false),
+    [online, setOnline] = useState(true),
+    [page, setPage] = useState<Page>("overview"),
+    [dialog, setDialog] = useState<Dialog | null>(null),
+    [toast, setToast] = useState(""),
+    [busy, setBusy] = useState(false),
+    [query, setQuery] = useState(""),
+    [teamFilter, setTeamFilter] = useState(""),
+    [matchFilter, setMatchFilter] = useState("all"),
+    [selectedMatch, setSelectedMatch] = useState<string | null>(null),
+    [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(() => Boolean(adminToken())),
+    [authOpen, setAuthOpen] = useState(false),
+    [authError, setAuthError] = useState("");
+  const revision = useRef(-1),
+    toastTimer = useRef<any>(null),
+    saving = useRef(false);
+  const notify = (m: string) => {
+    setToast(m);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(""), 5000);
+  };
+  const accept = useCallback((r: any) => {
+    if (r.revision >= revision.current) {
+      revision.current = r.revision;
+      setS(r.data);
+    }
+    setLoaded(true);
+    setOnline(true);
+  }, []);
+  const refresh = useCallback(async () => {
+    try {
+      const r = await apiFetch("/api/league", { cache: "no-store" });
+      if (!r.ok) throw Error();
+      accept(await r.json());
+    } catch {
+      setOnline(false);
+    }
+  }, [accept]);
+  useEffect(() => {
+    refresh();
+    const timer = setInterval(() => {
+      if (!document.hidden) refresh();
+    }, 3000);
+    const onVisible = () => {
+      if (!document.hidden) refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refresh]);
+  const mutate = async (action: any, close = true) => {
+    if (saving.current) return false;
+    saving.current = true;
+    setBusy(true);
+    try {
+      const r = await apiFetch("/api/league", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action),
+      });
+      const body: any = await r.json();
+      if (!r.ok) throw Error(body.error || "保存失败");
+      accept(body);
+      if (close) setDialog(null);
+      notify("已保存，联赛数据已更新");
+      return true;
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "网络异常，请重试");
+      return false;
+    } finally {
+      saving.current = false;
+      setBusy(false);
+    }
+  };
+  const go = (p: Page) => {
+    setPage(p);
+    setQuery("");
+    setTeamFilter("");
+    setSelectedPlayer(null);
+    setSelectedMatch(null);
+  };
+  const close = useCallback(() => setDialog(null), []);
+  const team = (id: string) => {
+    const t = s.teams.find((t) => t.id === id);
+    if (t) return t;
+    const m = s.matches.find(
+      (m) => m.kind === "pickup" && (m.homeId === id || m.awayId === id),
+    );
+    return m ? matchTeam(s.teams, m, id) : undefined;
+  };
+  const player = (id: string) => s.players.find((p) => p.id === id);
+  const editTeam = (t?: Team) => setDialog({ kind: "team", data: t });
+  const editPlayer = (p?: Player) => {
+    if (!s.teams.length) {
+      notify("先登记一支球队，就可以添加球员了");
+      editTeam();
+      return;
+    }
+    setDialog({ kind: "player", data: p });
+  };
+  const editMatch = (m?: Match) => setDialog({ kind: "match", data: m });
+  const editResult = (m?: Match) => setDialog({ kind: "result", data: m });
+  const confirm = (title: string, desc: string, action: any) =>
+    setDialog({ kind: "confirm", data: { title, desc, action } });
+  const live = s.matches.filter((m) => m.status === "live"),
+    table = standings(s),
+    finished = s.matches.filter((m) => m.status === "finished").length;
+  const current = s.matches.find((m) => m.id === selectedMatch),
+    profile = s.players.find((p) => p.id === selectedPlayer);
+  const tableView = (limit?: number) => (
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>排名</th>
+            <th className="align-left">球队</th>
+            <th>场次</th>
+            {!limit && (
+              <>
+                <th>胜</th>
+                <th>平</th>
+                <th>负</th>
+                <th>进 / 失</th>
+                <th>净胜球</th>
+              </>
+            )}
+            <th>积分</th>
+          </tr>
+        </thead>
+        <tbody>
+          {table.slice(0, limit).map((t, i) => (
+            <tr key={t.id}>
+              <td>
+                <span className={i === 0 && finished ? "rank first" : "rank"}>
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+              </td>
+              <td>
+                <div className="team-cell">
+                  <Badge team={t} />
+                  <b>{t.name}</b>
+                </div>
+              </td>
+              <td>{t.played}</td>
+              {!limit && (
+                <>
+                  <td>{t.win}</td>
+                  <td>{t.draw}</td>
+                  <td>{t.loss}</td>
+                  <td>
+                    {t.gf} / {t.ga}
+                  </td>
+                  <td>
+                    {t.gd > 0 ? "+" : ""}
+                    {t.gd}
+                  </td>
+                </>
+              )}
+              <td>
+                <b className="points">{t.points}</b>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!s.teams.length && (
+        <Empty
+          icon={Trophy}
+          title="冠军席位，虚位以待"
+          desc="登记第一支球队，开启积分榜。"
+          action={() => editTeam()}
+          label="登记球队"
+        />
+      )}
+    </div>
+  );
+  const matchCard = (m: Match) => {
+    const sc = score(m);
+    return (
+      <button
+        key={m.id}
+        className="match-card"
+        onClick={() => {
+          setSelectedMatch(m.id);
+          setPage("matches");
+        }}
+      >
+        <div className="match-meta">
+          <span>
+            {m.kind === "pickup" && (
+              <span className="pickup-tag">临时组队</span>
+            )}
+            {m.round} <span className="dot-divider">·</span> {dateLabel(m.time)}
+          </span>
+          <span className={`status ${m.status}`}>
+            {m.status === "live" ? (
+              <>
+                <i />
+                进行中
+              </>
+            ) : m.status === "finished" ? (
+              "已完赛"
+            ) : (
+              "未开赛"
+            )}
+          </span>
+        </div>
+        <div className="versus">
+          <div>
+            <Badge team={team(m.homeId)} />
+            <b>{team(m.homeId)?.name}</b>
+          </div>
+          <strong>
+            {m.status === "scheduled" ? (
+              <span className="vs">VS</span>
+            ) : (
+              <>
+                {sc[0]} <em>:</em> {sc[1]}
+              </>
+            )}
+          </strong>
+          <div>
+            <Badge team={team(m.awayId)} />
+            <b>{team(m.awayId)?.name}</b>
+          </div>
+        </div>
+        <div className="match-foot">
+          <span>
+            {m.status === "scheduled"
+              ? "赛程详情"
+              : m.status === "live"
+                ? "进入比赛记分"
+                : "查看比赛战报"}
+          </span>
+          <ArrowUpRight size={15} />
+        </div>
+      </button>
+    );
+  };
+  const exportData = () => {
+    const blob = new Blob(
+        [
+          JSON.stringify(
+            { league: s, exportedAt: new Date().toISOString(), version: 1 },
+            null,
+            2,
+          ),
+        ],
+        { type: "application/json" },
+      ),
+      url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `G超联赛-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    notify("数据快照已导出（头像以链接保存）");
+  };
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <button
+          className="brand"
+          onClick={() => go("overview")}
+          aria-label="G超联赛首页"
+        >
+          <span className="brand-g">
+            G<span>★</span>
+          </span>
+          <span>
+            <b>G超联赛</b>
+            <small>TABLE FOOTBALL LEAGUE</small>
+          </span>
+        </button>
+        <div className="side-label">
+          赛事中心 <span>LEAGUE CENTER</span>
+        </div>
+        <nav>
+          {nav.map((n) => (
+            <button
+              key={n.id}
+              className={`nav-item ${page === n.id ? "active" : ""}`}
+              onClick={() => go(n.id as Page)}
+            >
+              <n.icon size={19} />
+              <span>{n.label}</span>
+              {n.id === "matches" && live.length > 0 && (
+                <b className="nav-count">{live.length}</b>
+              )}
+              {page === n.id && <ChevronRight size={15} />}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="mini-pitch">
+            <Goal size={25} />
+            <p>小小球场，大大热爱。</p>
+            <span>THE GAME IS ON.</span>
+          </div>
+          <button
+            className={`nav-item ${page === "settings" ? "active" : ""}`}
+            onClick={() => go("settings")}
+          >
+            <Settings size={18} />
+            <span>联赛设置</span>
+          </button>
+          <div className="manager">
+            <span>G</span>
+            <div>
+              <b>联赛管理中心</b>
+              <small>每一球，都算数</small>
+            </div>
+            <span className="manager-dot" />
+          </div>
+        </div>
+      </aside>
+      <div className="main-shell">
+        <header className="topbar">
+          <div className="breadcrumb">
+            赛事中心 <ChevronRight size={13} />
+            <span>{nav.find((n) => n.id === page)?.label || "联赛设置"}</span>
+          </div>
+          <div className="top-actions">
+            <button
+              className="text-btn"
+              onClick={() => {
+                if (isAdmin) {
+                  clearAdmin();
+                  setIsAdmin(false);
+                  notify("已退出管理");
+                } else {
+                  setAuthError("");
+                  setAuthOpen(true);
+                }
+              }}
+            >
+              {isAdmin ? "退出管理" : "管理员登录"}
+            </button>
+            <span className={`sync ${online ? "" : "offline"}`}>
+              <i />
+              {!loaded && online
+                ? "正在连接"
+                : online
+                  ? "实时同步"
+                  : "连接中断"}
+            </span>
+            <span className="season-pill">
+              <CalendarDays size={14} />
+              {s.settings.season}
+            </span>
+            <button
+              className="top-avatar"
+              aria-label="联赛设置"
+              title="联赛设置"
+              onClick={() => go("settings")}
+            >
+              <Settings size={16} />
+            </button>
+          </div>
+        </header>
+        <main>
+          {!loaded ? (
+            <div className="loading-state">
+              {online ? (
+                <>
+                  <Loader2 className="spin" />
+                  <h2>正在连接赛场…</h2>
+                </>
+              ) : (
+                <>
+                  <Activity />
+                  <h2>
+                    {apiConfigured
+                      ? "暂时无法加载联赛"
+                      : "等待连接联赛数据服务"}
+                  </h2>
+                  <p>
+                    {apiConfigured
+                      ? "请检查网络后重试，数据不会被清空。"
+                      : "网站页面已就绪，管理员完成数据服务配置后即可使用。"}
+                  </p>
+                  <a
+                    href="https://github.com/GSuperLeague/g-super-league#部署"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    查看部署说明
+                  </a>
+                  <button className="btn primary" onClick={refresh}>
+                    <RefreshCw size={16} />
+                    重新连接
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            <>
+              {!online && (
+                <div className="notice">
+                  <Activity size={16} />
+                  同步暂时中断，当前显示上次读取的数据。
+                  <button onClick={refresh}>重新连接</button>
+                </div>
+              )}
+              {page === "overview" && (
+                <>
+                  <div className="page-heading">
+                    <div>
+                      <span className="eyebrow">
+                        THE HOME OF TABLE FOOTBALL
+                      </span>
+                      <h1>
+                        联赛总览<span className="title-dot">.</span>
+                      </h1>
+                    </div>
+                    <button
+                      className="btn primary"
+                      onClick={() => editResult()}
+                    >
+                      <Plus size={17} />
+                      录入赛后比分
+                    </button>
+                  </div>
+                  <section className="hero">
+                    <div className="hero-copy">
+                      <div className="hero-label">
+                        <span />
+                        G超 · 桌面足球超级联赛
+                      </div>
+                      <h2>
+                        每一球，
+                        <br />都<span>算数。</span>
+                      </h2>
+                      <p>属于我们的球场，属于每个人的高光。</p>
+                      <button
+                        className="btn lime"
+                        onClick={() =>
+                          s.teams.length ? go("matches") : editTeam()
+                        }
+                      >
+                        {s.teams.length ? "进入比赛中心" : "登记第一支球队"}
+                        <ArrowUpRight size={17} />
+                      </button>
+                      <div className="hero-bottom">
+                        PASSION. PRECISION. GLORY.
+                      </div>
+                    </div>
+                    <Pitch />
+                  </section>
+                  <div className="stat-grid">
+                    {[
+                      {
+                        label: "参赛球队",
+                        num: s.teams.length,
+                        unit: "支",
+                        icon: Shield,
+                        sub: "为共同的队徽而战",
+                      },
+                      {
+                        label: "注册球员",
+                        num: s.players.length,
+                        unit: "位",
+                        icon: Users,
+                        sub: "每个人都有自己的主场",
+                      },
+                      {
+                        label: "已完成比赛",
+                        num: finished,
+                        unit: "场",
+                        icon: Flag,
+                        sub: live.length
+                          ? `${live.length} 场比赛正在进行`
+                          : "下一场精彩，值得期待",
+                      },
+                      {
+                        label: "联赛总进球",
+                        num: s.matches
+                          .filter((m) => m.status !== "scheduled")
+                          .reduce(
+                            (sum, m) => sum + score(m)[0] + score(m)[1],
+                            0,
+                          ),
+                        unit: "球",
+                        icon: Goal,
+                        sub: "记录每一个破门瞬间",
+                      },
+                    ].map((item) => (
+                      <div className="stat" key={item.label}>
+                        <div>
+                          <span>{item.label}</span>
+                          <item.icon size={19} />
+                        </div>
+                        <strong>
+                          {String(item.num).padStart(2, "0")}
+                          <small>{item.unit}</small>
+                        </strong>
+                        <p>{item.sub}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {(!s.teams.length ||
+                    !s.players.length ||
+                    !s.matches.length) && (
+                    <section className="onboarding">
+                      <div>
+                        <span className="eyebrow">LET'S GET STARTED</span>
+                        <h3>联赛，从这里开场</h3>
+                        <p>三步准备，让热爱正式上场。</p>
+                      </div>
+                      <div className="steps">
+                        {[
+                          {
+                            label: "登记球队",
+                            sub: "创建队名与专属队徽",
+                            done: s.teams.length > 0,
+                            fn: () => editTeam(),
+                          },
+                          {
+                            label: "添加球员",
+                            sub: "完善球员与能力档案",
+                            done: s.players.length > 0,
+                            fn: () => editPlayer(),
+                          },
+                          {
+                            label: "创建比赛",
+                            sub: "选好对手，准备开球",
+                            done: s.matches.length > 0,
+                            fn: () => editMatch(),
+                          },
+                        ].map((item, i) => (
+                          <button
+                            key={item.label}
+                            onClick={item.fn}
+                            className={item.done ? "step done" : "step"}
+                          >
+                            <span>
+                              {item.done ? <Check size={16} /> : `0${i + 1}`}
+                            </span>
+                            <div>
+                              <b>{item.label}</b>
+                              <small>{item.sub}</small>
+                            </div>
+                            <ArrowUpRight size={16} />
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                  <EloLeaders
+                    league={s}
+                    onPlayer={(id) => {
+                      go("players");
+                      setSelectedPlayer(id);
+                    }}
+                    onAnalytics={() => go("analytics")}
+                  />
+                  <div className="dashboard-grid">
+                    <section className="panel">
+                      <div className="panel-heading">
+                        <h2>
+                          <span className="section-line" />
+                          球队积分榜
+                        </h2>
+                        <button
+                          className="text-btn"
+                          onClick={() => go("table")}
+                        >
+                          完整榜单
+                          <ArrowUpRight size={15} />
+                        </button>
+                      </div>
+                      {tableView(5)}
+                      <div className="panel-note">
+                        胜 {s.settings.win} 分 · 平 {s.settings.draw} 分 · 负{" "}
+                        {s.settings.loss} 分 · 完赛后结算
+                      </div>
+                    </section>
+                    <section className="panel fixtures">
+                      <div className="panel-heading">
+                        <h2>
+                          <span className="section-line" />
+                          赛场动态
+                          {live.length > 0 && (
+                            <span className="live-tag">LIVE</span>
+                          )}
+                        </h2>
+                        <button
+                          className="text-btn"
+                          onClick={() => go("matches")}
+                        >
+                          全部赛程
+                          <ArrowUpRight size={15} />
+                        </button>
+                      </div>
+                      {s.matches.length ? (
+                        <div className="fixture-list">
+                          {[...s.matches]
+                            .sort(
+                              (a, b) =>
+                                (a.status === "live" ? -1 : 0) -
+                                  (b.status === "live" ? -1 : 0) ||
+                                new Date(b.time).getTime() -
+                                  new Date(a.time).getTime(),
+                            )
+                            .slice(0, 2)
+                            .map(matchCard)}
+                        </div>
+                      ) : (
+                        <Empty
+                          icon={CalendarDays}
+                          title="哨声，等待你吹响"
+                          desc="完成球队与球员登记，即可安排首场对决。"
+                          action={() => editMatch()}
+                          label="创建比赛"
+                        />
+                      )}
+                    </section>
+                  </div>
+                </>
+              )}
+              {page === "analytics" && (
+                <AnalyticsPage
+                  league={s}
+                  onPlayer={(id) => {
+                    go("players");
+                    setSelectedPlayer(id);
+                  }}
+                  onMatch={(id) => {
+                    go("matches");
+                    setSelectedMatch(id);
+                  }}
+                />
+              )}
+              {page === "teams" && (
+                <>
+                  <PageHeading
+                    eyebrow="THE CLUBS"
+                    title="每支球队，都有故事"
+                    desc="组建队伍，找到并肩作战的伙伴。"
+                    button="登记球队"
+                    action={() => editTeam()}
+                  />
+                  <div className="filterbar">
+                    <SearchBox
+                      query={query}
+                      setQuery={setQuery}
+                      placeholder="搜索球队名称…"
+                    />
+                    <span>{s.teams.length} 支参赛球队</span>
+                  </div>
+                  {s.teams.length ? (
+                    <div className="team-grid">
+                      {s.teams
+                        .filter((t) => t.name.includes(query))
+                        .map((t) => {
+                          const row = table.find((x) => x.id === t.id)!;
+                          const members = s.players.filter((p) =>
+                            isTeamMember(p, t.id),
+                          );
+                          return (
+                            <section className="team-card panel" key={t.id}>
+                              <div
+                                className="team-card-top"
+                                style={{ "--team": t.color } as any}
+                              >
+                                <Badge team={t} size="large" />
+                                <div className="card-actions">
+                                  <button
+                                    aria-label={`编辑${t.name}`}
+                                    className="icon-btn"
+                                    onClick={() => editTeam(t)}
+                                  >
+                                    <Pencil size={16} />
+                                  </button>
+                                  <button
+                                    aria-label={`删除${t.name}`}
+                                    className="icon-btn"
+                                    onClick={() =>
+                                      confirm(
+                                        "删除球队？",
+                                        "有球员或比赛记录的球队不能删除。",
+                                        { type: "team.delete", id: t.id },
+                                      )
+                                    }
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                                <span className="team-abbr">{t.short}</span>
+                              </div>
+                              <div className="team-card-body">
+                                <span className="eyebrow">
+                                  G SUPER LEAGUE CLUB
+                                </span>
+                                <h2>{t.name}</h2>
+                                <p>{t.bio || "球队故事，等你来书写。"}</p>
+                                <div className="team-metrics">
+                                  <div>
+                                    <b>{members.length}</b>
+                                    <small>球员</small>
+                                  </div>
+                                  <div>
+                                    <b>{row.played}</b>
+                                    <small>已赛</small>
+                                  </div>
+                                  <div>
+                                    <b>{row.points}</b>
+                                    <small>积分</small>
+                                  </div>
+                                </div>
+                                <button
+                                  className="text-btn full"
+                                  onClick={() => {
+                                    go("players");
+                                    setTeamFilter(t.id);
+                                  }}
+                                >
+                                  查看球队阵容
+                                  <ArrowRight size={16} />
+                                </button>
+                              </div>
+                            </section>
+                          );
+                        })}
+                    </div>
+                  ) : (
+                    <div className="panel">
+                      <Empty
+                        icon={Shield}
+                        title="给你的球队，一个名字"
+                        desc="登记队名、简称和主题色，开启 G超联赛之旅。"
+                        action={() => editTeam()}
+                        label="登记第一支球队"
+                      />
+                    </div>
+                  )}
+                  {s.teams.length > 0 &&
+                    !s.teams.some((t) => t.name.includes(query)) && (
+                      <Empty title="没有找到球队" desc="试试其他搜索关键词。" />
+                    )}
+                </>
+              )}
+              {page === "players" && !profile && (
+                <PlayerDirectory
+                  league={s}
+                  query={query}
+                  setQuery={setQuery}
+                  teamFilter={teamFilter}
+                  setTeamFilter={setTeamFilter}
+                  onPlayer={setSelectedPlayer}
+                  onEdit={editPlayer}
+                  onAdd={() => editPlayer()}
+                />
+              )}
+              {page === "players" && profile && (
+                <PlayerProfile
+                  key={profile.id}
+                  league={s}
+                  player={profile}
+                  onBack={() => setSelectedPlayer(null)}
+                  onPlayer={setSelectedPlayer}
+                  onEdit={() => editPlayer(profile)}
+                  onDelete={() =>
+                    confirm(
+                      "删除球员档案？",
+                      "已有比赛记录的球员不可删除，可通过编辑资料调整所属球队。",
+                      { type: "player.delete", id: profile.id },
+                    )
+                  }
+                  matchCard={matchCard}
+                />
+              )}
+              {page === "table" && (
+                <>
+                  <PageHeading
+                    eyebrow="THE STANDINGS"
+                    title="向榜首，进发"
+                    desc="每一场较量，都让冠军更近一步。"
+                  />
+                  <section className="rules-strip">
+                    <Trophy size={19} />
+                    <b>{s.settings.season}</b>
+                    <span>胜 {s.settings.win} 分</span>
+                    <span>平 {s.settings.draw} 分</span>
+                    <span>负 {s.settings.loss} 分</span>
+                    <button className="text-btn" onClick={() => go("settings")}>
+                      积分规则
+                      <Info size={15} />
+                    </button>
+                  </section>
+                  <section className="panel">
+                    {tableView()}
+                    <div className="panel-note">
+                      仅统计已完赛的常驻球队比赛；临时组队不参与。依次按积分、净胜球、进球数排序；三项相同按队名字序展示，不代表正式决胜结果。
+                    </div>
+                  </section>
+                </>
+              )}
+              {page === "matches" && !current && (
+                <>
+                  <PageHeading
+                    eyebrow="MATCH CENTER"
+                    title="好戏，即将开场"
+                    desc="记录比分与位置，自动更新战绩、搭档表现和 Elo。"
+                    button="录入赛后比分"
+                    action={() => editResult()}
+                  />
+                  <div className="result-intro">
+                    <span>
+                      <CheckCircle2 size={17} />
+                      不用逐球登记：最终比分 + 双方前锋与后卫，一次完成结算。
+                    </span>
+                    <button
+                      className="btn secondary"
+                      onClick={() => editMatch()}
+                    >
+                      <CalendarDays size={15} />
+                      创建赛程
+                    </button>
+                  </div>
+                  <div className="filterbar">
+                    <div className="tabs">
+                      {[
+                        { id: "all", t: "全部比赛" },
+                        { id: "live", t: "进行中" },
+                        { id: "scheduled", t: "未开赛" },
+                        { id: "finished", t: "已完赛" },
+                      ].map((x) => (
+                        <button
+                          key={x.id}
+                          onClick={() => setMatchFilter(x.id)}
+                          className={matchFilter === x.id ? "active" : ""}
+                        >
+                          {x.t}
+                          {x.id === "live" && live.length > 0 && (
+                            <span>{live.length}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    <span>共 {s.matches.length} 场比赛</span>
+                  </div>
+                  {s.matches.filter(
+                    (m) => matchFilter === "all" || m.status === matchFilter,
+                  ).length ? (
+                    <div className="match-grid">
+                      {[...s.matches]
+                        .filter(
+                          (m) =>
+                            matchFilter === "all" || m.status === matchFilter,
+                        )
+                        .sort(
+                          (a, b) =>
+                            new Date(b.time).getTime() -
+                            new Date(a.time).getTime(),
+                        )
+                        .map(matchCard)}
+                    </div>
+                  ) : (
+                    <section className="panel">
+                      <Empty
+                        icon={CalendarDays}
+                        title={
+                          s.matches.length
+                            ? "这个分组还没有比赛"
+                            : "第一场对决，由你安排"
+                        }
+                        desc="选择双方球队、前锋和后卫，填写已经结束的比赛比分。"
+                        action={() => editResult()}
+                        label="录入赛后比分"
+                      />
+                    </section>
+                  )}
+                </>
+              )}
+              {page === "matches" && current && (
+                <>
+                  <button
+                    className="back-btn"
+                    onClick={() => setSelectedMatch(null)}
+                  >
+                    <ChevronLeft size={17} />
+                    返回赛程中心
+                  </button>
+                  <section className="scoreboard">
+                    <div className="scoreboard-top">
+                      <span>
+                        {current.kind === "pickup" ? "临时组队 · " : ""}
+                        {current.round} · {dateLabel(current.time)}（北京时间）
+                      </span>
+                      <span className={`status ${current.status}`}>
+                        {current.status === "live" ? (
+                          <>
+                            <i />
+                            正在比赛
+                          </>
+                        ) : current.status === "finished" ? (
+                          "全场结束"
+                        ) : (
+                          "即将开赛"
+                        )}
+                      </span>
+                    </div>
+                    <div className="big-score">
+                      <div>
+                        <Badge team={team(current.homeId)} size="large" />
+                        <h2>{team(current.homeId)?.name}</h2>
+                        <span>主队</span>
+                      </div>
+                      <strong>
+                        {score(current)[0]}
+                        <em>:</em>
+                        {score(current)[1]}
+                      </strong>
+                      <div>
+                        <Badge team={team(current.awayId)} size="large" />
+                        <h2>{team(current.awayId)?.name}</h2>
+                        <span>客队</span>
+                      </div>
+                    </div>
+                    <div className="scoreboard-actions">
+                      <button
+                        className="btn lime"
+                        onClick={() => editResult(current)}
+                      >
+                        <Pencil size={16} />
+                        {current.summary ? "编辑赛后结果" : "录入最终比分"}
+                      </button>
+                      {!current.summary &&
+                        (current.status === "scheduled" ? (
+                          <>
+                            <button
+                              disabled={busy}
+                              className="btn lime"
+                              onClick={() =>
+                                mutate(
+                                  { type: "match.start", id: current.id },
+                                  false,
+                                )
+                              }
+                            >
+                              <Play size={16} />
+                              开始比赛
+                            </button>
+                            <button
+                              className="btn ghost"
+                              onClick={() => editMatch(current)}
+                            >
+                              <Pencil size={15} />
+                              编辑赛程
+                            </button>
+                          </>
+                        ) : current.status === "live" ? (
+                          <>
+                            <button
+                              className="btn lime"
+                              onClick={() =>
+                                setDialog({
+                                  kind: "goal",
+                                  data: {
+                                    match: current,
+                                    teamId: current.homeId,
+                                  },
+                                })
+                              }
+                            >
+                              <Plus size={17} />
+                              主队进球
+                            </button>
+                            <button
+                              className="btn lime"
+                              onClick={() =>
+                                setDialog({
+                                  kind: "goal",
+                                  data: {
+                                    match: current,
+                                    teamId: current.awayId,
+                                  },
+                                })
+                              }
+                            >
+                              <Plus size={17} />
+                              客队进球
+                            </button>
+                            <button
+                              className="btn ghost"
+                              onClick={() =>
+                                confirm(
+                                  "确认结束本场比赛？",
+                                  "完赛后结果立即计入球队积分榜。需要纠错时，可重新打开比赛。",
+                                  { type: "match.finish", id: current.id },
+                                )
+                              }
+                            >
+                              <Flag size={16} />
+                              结束比赛
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="btn ghost"
+                            onClick={() =>
+                              confirm(
+                                "重新打开比赛？",
+                                "本场结果将暂时从积分榜移除。修正进球后，请再次结束比赛。",
+                                { type: "match.reopen", id: current.id },
+                              )
+                            }
+                          >
+                            <Undo2 size={16} />
+                            重新打开 / 修正比分
+                          </button>
+                        ))}
+                    </div>
+                  </section>
+                  <div className="match-scope-note">
+                    {current.kind === "pickup"
+                      ? "本场为队伍A / 队伍B临时组队，计入个人表现、搭档数据和 Elo，不计入常驻球队积分榜。"
+                      : "本场为常驻球队比赛，完赛后计入球队积分榜；赛后结果同时结算个人榜单。"}
+                  </div>
+                  <MatchElo
+                    key={current.id}
+                    league={s}
+                    match={current}
+                    onPlayer={(id) => {
+                      go("players");
+                      setSelectedPlayer(id);
+                    }}
+                  />
+                  <div className="match-detail-grid">
+                    <section className="panel">
+                      <div className="panel-heading">
+                        <h2>{current.summary ? "赛后结算" : "进球时间线"}</h2>
+                        <span className="muted">
+                          {score(current)[0] + score(current)[1]} 粒进球
+                        </span>
+                      </div>
+                      {current.summary ? (
+                        <div className="settlement-list">
+                          {[
+                            {
+                              teamId: current.homeId,
+                              forward: current.summary.homeForwardId,
+                              defender: current.summary.homeDefenderId,
+                              goals: current.summary.homeScore,
+                              defense:
+                                current.summary.homeScore -
+                                current.summary.awayScore,
+                            },
+                            {
+                              teamId: current.awayId,
+                              forward: current.summary.awayForwardId,
+                              defender: current.summary.awayDefenderId,
+                              goals: current.summary.awayScore,
+                              defense:
+                                current.summary.awayScore -
+                                current.summary.homeScore,
+                            },
+                          ].map((x) => (
+                            <div className="settlement-team" key={x.teamId}>
+                              <h3>
+                                <Badge team={team(x.teamId)} />
+                                {team(x.teamId)?.name}
+                              </h3>
+                              <div>
+                                <span>前锋 · {player(x.forward)?.name}</span>
+                                <b>
+                                  {x.goals}
+                                  <small> 前锋时球队得分</small>
+                                </b>
+                              </div>
+                              <div>
+                                <span>后卫 · {player(x.defender)?.name}</span>
+                                <b>
+                                  {signed(x.defense)}
+                                  <small> 后卫时球队净胜球</small>
+                                </b>
+                              </div>
+                            </div>
+                          ))}
+                          <p className="help-text">
+                            赛后汇总记录球队比分与本场位置；射手榜沿用原版将本队进球计给前锋的口径，不代表真实逐球归属。位置表现、搭档数据与
+                            Elo 按本场结果重新计算。
+                          </p>
+                        </div>
+                      ) : current.goals.length ? (
+                        <div className="timeline">
+                          {current.goals.map((g, i) => (
+                            <div className="goal-event" key={g.id}>
+                              <span className="event-minute">{g.minute}′</span>
+                              <span className="event-ball">
+                                <Goal size={19} />
+                              </span>
+                              <div>
+                                <b>
+                                  {g.playerId
+                                    ? player(g.playerId)?.name || "已归档球员"
+                                    : "未指定球员"}
+                                  {g.ownGoal && (
+                                    <span className="og-label">乌龙球</span>
+                                  )}
+                                </b>
+                                <small>{team(g.teamId)?.name} 得分</small>
+                              </div>
+                              <strong>
+                                {
+                                  current.goals
+                                    .slice(0, i + 1)
+                                    .filter((e) => e.teamId === current.homeId)
+                                    .length
+                                }{" "}
+                                :{" "}
+                                {
+                                  current.goals
+                                    .slice(0, i + 1)
+                                    .filter((e) => e.teamId === current.awayId)
+                                    .length
+                                }
+                              </strong>
+                              {current.status === "live" && (
+                                <button
+                                  className="icon-btn"
+                                  aria-label={`撤销第${i + 1}个进球`}
+                                  onClick={() =>
+                                    confirm(
+                                      "撤销这粒进球？",
+                                      "比分和比赛统计将同步扣除该记录。",
+                                      {
+                                        type: "goal.delete",
+                                        id: current.id,
+                                        goalId: g.id,
+                                      },
+                                    )
+                                  }
+                                >
+                                  <Undo2 size={15} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <Empty
+                          icon={Goal}
+                          title="等待第一粒进球"
+                          desc="开始比赛后，点击主队或客队进球并选择进球队员。"
+                        />
+                      )}
+                    </section>
+                    <section className="panel roster">
+                      <div className="panel-heading">
+                        <h2>本场出场阵容</h2>
+                      </div>
+                      {[current.homeId, current.awayId].map((id, i) => (
+                        <div className="roster-team" key={id}>
+                          <h3>
+                            <Badge team={team(id)} />
+                            {team(id)?.name}
+                          </h3>
+                          {(i === 0
+                            ? current.homePlayers
+                            : current.awayPlayers
+                          ).map((pid) => {
+                            const p = player(pid);
+                            return p ? (
+                              <button
+                                key={pid}
+                                className="roster-player"
+                                onClick={() => {
+                                  go("players");
+                                  setSelectedPlayer(pid);
+                                }}
+                              >
+                                <Avatar player={p} />
+                                <b>{p.name}</b>
+                                <span>
+                                  {current.summary
+                                    ? p.id === current.summary.homeForwardId ||
+                                      p.id === current.summary.awayForwardId
+                                      ? "本场前锋"
+                                      : "本场后卫"
+                                    : p.position}
+                                </span>
+                                <small>#{p.number}</small>
+                              </button>
+                            ) : null;
+                          })}
+                        </div>
+                      ))}
+                    </section>
+                  </div>
+                  <div className="delete-match">
+                    <span>
+                      误建的比赛可以删除，相关比分和个人进球也将一并移除。
+                    </span>
+                    <button
+                      className="text-btn danger"
+                      onClick={() =>
+                        confirm(
+                          "永久删除这场比赛？",
+                          "本场比分、出场和进球记录将全部移除，榜单也会重新计算。此操作无法撤销。",
+                          { type: "match.delete", id: current.id },
+                        )
+                      }
+                    >
+                      <Trash2 size={14} />
+                      删除比赛
+                    </button>
+                  </div>
+                </>
+              )}
+              {page === "settings" && (
+                <>
+                  <PageHeading
+                    eyebrow="LEAGUE SETTINGS"
+                    title="你的联赛，你来定义"
+                    desc="设置赛季名称与积分规则，做好每一场比赛的准备。"
+                  />
+                  <div className="settings-grid">
+                    <section className="panel settings-panel">
+                      <h2>赛季与积分规则</h2>
+                      <p className="muted">
+                        修改规则后，所有已完赛比赛会重新计算积分。
+                      </p>
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const f = new FormData(e.currentTarget);
+                          mutate(
+                            {
+                              type: "settings.save",
+                              id: "settings",
+                              data: {
+                                season: f.get("season"),
+                                win: Number(f.get("win")),
+                                draw: Number(f.get("draw")),
+                                loss: Number(f.get("loss")),
+                              },
+                            },
+                            false,
+                          );
+                        }}
+                        key={JSON.stringify(s.settings)}
+                      >
+                        <label>
+                          赛季名称
+                          <input
+                            name="season"
+                            defaultValue={s.settings.season}
+                            maxLength={30}
+                            required
+                          />
+                        </label>
+                        <div className="form-grid three">
+                          {[
+                            { n: "win", l: "获胜积分" },
+                            { n: "draw", l: "平局积分" },
+                            { n: "loss", l: "失利积分" },
+                          ].map((x) => (
+                            <label key={x.n}>
+                              {x.l}
+                              <input
+                                type="number"
+                                min="0"
+                                max="10"
+                                name={x.n}
+                                defaultValue={s.settings[x.n as "win"]}
+                                required
+                              />
+                            </label>
+                          ))}
+                        </div>
+                        <p className="help-text">
+                          赛季名称仅为标签，修改不会清空已有比赛。积分相同依次比较净胜球、进球数。
+                        </p>
+                        <button className="btn primary" disabled={busy}>
+                          {busy ? (
+                            <Loader2 size={16} className="spin" />
+                          ) : (
+                            <Check size={16} />
+                          )}
+                          保存规则
+                        </button>
+                      </form>
+                    </section>
+                    <div>
+                      <section className="panel settings-panel">
+                        <Download size={25} />
+                        <h2>导出联赛数据</h2>
+                        <p>
+                          导出球队、球员、比赛、进球及积分设置的 JSON
+                          快照。头像以链接保留。
+                        </p>
+                        <button className="btn secondary" onClick={exportData}>
+                          <Download size={16} />
+                          导出数据快照
+                        </button>
+                      </section>
+                      <section className="panel settings-panel about">
+                        <span className="eyebrow">HOW IT WORKS</span>
+                        <h2>记分说明</h2>
+                        <ul>
+                          <li>
+                            球员可加入多个球队，在球员卡片或档案页点击“编辑资料”修改。
+                          </li>
+                          <li>
+                            每队每场可登记 1–4
+                            位出场球员；同一场比赛中，每位球员只能代表一方。
+                          </li>
+                          <li>
+                            临时组队自由选择所有已登记球员，固定显示队伍A /
+                            队伍B，计个人表现、搭档数据与
+                            Elo，不影响常驻球队积分。
+                          </li>
+                          <li>
+                            赛后可直接填写最终比分，指定双方固定前锋和后卫，保存即完赛。
+                          </li>
+                          <li>
+                            得失分按球员在场时的球队比分统计，不等同于个人进球。前锋和后卫数据只使用本场明确记录的位置。
+                          </li>
+                          <li>
+                            球队积分、球员表现、搭档战绩和 Elo
+                            随赛果重新计算；其他页面每 3 秒同步。
+                          </li>
+                          <li>球队积分仅在比赛结束后结算。</li>
+                          <li>
+                            身价使用虚拟
+                            G币，六维能力由管理者手动评定，不会因比赛自动改变。
+                          </li>
+                          <li>
+                            所有访客可查看联赛数据；管理员登录后可登记、录入和维护。
+                          </li>
+                        </ul>
+                      </section>
+                    </div>
+                  </div>
+                </>
+              )}
+              <footer className="footer">
+                <span>
+                  <b>G超联赛</b> · 每一球，都算数。
+                </span>
+                <span>
+                  BUILT FOR THE LOVE OF THE GAME{" "}
+                  <span className="footer-dot">●</span>
+                </span>
+              </footer>
+            </>
+          )}
+        </main>
+      </div>
+      {toast && (
+        <div className="toast" role="status">
+          <Info size={18} />
+          <span>{toast}</span>
+          <button onClick={() => setToast("")} aria-label="关闭提示">
+            <X size={15} />
+          </button>
+        </div>
+      )}
+      {authOpen && (
+        <Modal title="管理员登录" onClose={() => setAuthOpen(false)}>
+          <form
+            className="entity-form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setAuthError("");
+              const f = new FormData(e.currentTarget);
+              try {
+                await loginAdmin(String(f.get("token")));
+                setIsAdmin(true);
+                setAuthOpen(false);
+                notify("管理员已登录");
+              } catch (e) {
+                setAuthError(e instanceof Error ? e.message : "登录失败");
+              }
+            }}
+          >
+            <p className="help-text">
+              输入联赛管理员提供的管理密钥。本次登录仅在当前标签页保留。
+            </p>
+            <label>
+              管理密钥
+              <input
+                name="token"
+                type="password"
+                autoComplete="current-password"
+                required
+              />
+            </label>
+            {authError && <p role="alert">{authError}</p>}
+            <button className="btn primary" disabled={!apiConfigured}>
+              登录
+            </button>
+          </form>
+        </Modal>
+      )}
+      {dialog?.kind === "team" && (
+        <Modal
+          title={dialog.data ? "编辑球队" : "登记一支新球队"}
+          onClose={close}
+        >
+          <TeamForm
+            initial={dialog.data}
+            busy={busy}
+            onSave={(data) =>
+              mutate({ type: "team.save", id: dialog.data?.id || uid(), data })
+            }
+          />
+        </Modal>
+      )}
+      {dialog?.kind === "player" && (
+        <Modal
+          title={dialog.data ? "编辑球员档案" : "登记一位新球员"}
+          onClose={close}
+          wide
+        >
+          <PlayerForm
+            initial={dialog.data}
+            teams={s.teams}
+            busy={busy}
+            onError={notify}
+            onSave={(data) =>
+              mutate({
+                type: "player.save",
+                id: dialog.data?.id || uid(),
+                data,
+              })
+            }
+          />
+        </Modal>
+      )}
+      {dialog?.kind === "match" && (
+        <Modal
+          title={dialog.data ? "编辑比赛赛程" : "创建一场新比赛"}
+          onClose={close}
+          wide
+        >
+          <MatchForm
+            initial={dialog.data}
+            teams={s.teams}
+            players={s.players}
+            busy={busy}
+            onSave={(data) =>
+              mutate({ type: "match.save", id: dialog.data?.id || uid(), data })
+            }
+          />
+        </Modal>
+      )}
+      {dialog?.kind === "result" && (
+        <Modal
+          title={dialog.data ? "录入 / 编辑赛后结果" : "录入赛后比分"}
+          onClose={close}
+          wide
+        >
+          <ResultForm
+            initial={dialog.data}
+            teams={s.teams}
+            players={s.players}
+            busy={busy}
+            onSave={async (data) => {
+              const id = dialog.data?.id || data.resultId;
+              const ok = await mutate({ type: "match.result", id, data });
+              if (ok) {
+                setPage("matches");
+                setSelectedMatch(id);
+              }
+            }}
+          />
+        </Modal>
+      )}
+      {dialog?.kind === "goal" && (
+        <Modal title="记录进球瞬间" onClose={close}>
+          <GoalForm
+            match={
+              s.matches.find((m) => m.id === dialog.data.match.id) ||
+              dialog.data.match
+            }
+            teamId={dialog.data.teamId}
+            teams={s.teams}
+            players={s.players}
+            busy={busy}
+            onSave={(data) =>
+              mutate({ type: "goal.add", id: dialog.data.match.id, data })
+            }
+          />
+        </Modal>
+      )}
+      {dialog?.kind === "confirm" && (
+        <Modal title={dialog.data.title} onClose={close}>
+          <div className="confirm-content">
+            <p>{dialog.data.desc}</p>
+            <div className="form-footer">
+              <button className="btn secondary" onClick={close}>
+                取消
+              </button>
+              <button
+                className="btn primary"
+                disabled={busy}
+                onClick={() => mutate(dialog.data.action)}
+              >
+                {busy ? "正在保存…" : "确认操作"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+function PageHeading({
+  eyebrow,
+  title,
+  desc,
+  button,
+  action,
+}: {
+  eyebrow: string;
+  title: string;
+  desc?: string;
+  button?: string;
+  action?: () => void;
+}) {
+  return (
+    <div className="page-heading">
+      <div>
+        <span className="eyebrow">{eyebrow}</span>
+        <h1>
+          {title}
+          <span className="title-dot">.</span>
+        </h1>
+        {desc && <p>{desc}</p>}
+      </div>
+      {button && (
+        <button className="btn primary" onClick={action}>
+          <Plus size={17} />
+          {button}
+        </button>
+      )}
+    </div>
+  );
+}
+function SearchBox({
+  query,
+  setQuery,
+  placeholder,
+}: {
+  query: string;
+  setQuery: (s: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="searchbox">
+      <Search size={17} />
+      <input
+        aria-label={placeholder}
+        placeholder={placeholder}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {query && (
+        <button aria-label="清空搜索" onClick={() => setQuery("")}>
+          <X size={14} />
+        </button>
+      )}
+    </div>
+  );
+}
+function TeamForm({
+  initial,
+  busy,
+  onSave,
+}: {
+  initial?: Team;
+  busy: boolean;
+  onSave: (d: any) => void;
+}) {
+  const [color, setColor] = useState(initial?.color || "#365c49"),
+    [name, setName] = useState(initial?.name || ""),
+    [short, setShort] = useState(initial?.short || "");
+  return (
+    <form
+      className="entity-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        onSave({ name, short, color, bio: f.get("bio") });
+      }}
+    >
+      <div className="team-preview">
+        <Badge
+          team={{ id: "", name, short: short || "G", color, bio: "" }}
+          size="large"
+        />
+        <div>
+          <b>{name || "你的球队名称"}</b>
+          <span>专属颜色，专属队徽。</span>
+        </div>
+      </div>
+      <div className="form-grid">
+        <label>
+          球队名称 <em>*</em>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            maxLength={24}
+            placeholder="例如：旋风队"
+          />
+        </label>
+        <label>
+          球队简称 <em>*</em>
+          <input
+            value={short}
+            onChange={(e) => setShort(e.target.value)}
+            required
+            maxLength={4}
+            placeholder="例如：XF"
+          />
+        </label>
+      </div>
+      <label>球队主题色</label>
+      <div className="color-options">
+        {["#365c49", "#275e9b", "#b85143", "#78519a", "#cf9937", "#324052"].map(
+          (c) => (
+            <button
+              key={c}
+              type="button"
+              aria-label={`选择颜色 ${c}`}
+              className={c === color ? "selected" : ""}
+              style={{ background: c }}
+              onClick={() => setColor(c)}
+            >
+              {c === color && <Check size={17} />}
+            </button>
+          ),
+        )}
+        <input
+          aria-label="自定义球队颜色"
+          type="color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+        />
+      </div>
+      <label>
+        球队介绍
+        <textarea
+          name="bio"
+          defaultValue={initial?.bio || ""}
+          maxLength={300}
+          rows={3}
+          placeholder="写一句球队口号，或介绍你们的故事…"
+        />
+      </label>
+      <div className="form-footer">
+        <span className="help-text">保存后可继续添加球队球员。</span>
+        <button className="btn primary" disabled={busy}>
+          {busy ? "保存中…" : initial ? "保存修改" : "完成登记"}
+          <ArrowRight size={16} />
+        </button>
+      </div>
+    </form>
+  );
+}
+function PlayerForm({
+  initial,
+  teams,
+  busy,
+  onSave,
+  onError,
+}: {
+  initial?: Player;
+  teams: Team[];
+  busy: boolean;
+  onSave: (d: any) => void;
+  onError: (m: string) => void;
+}) {
+  const [teamIds, setTeamIds] = useState<string[]>(
+    initial ? playerTeamIds(initial) : teams[0] ? [teams[0].id] : [],
+  );
+  const [skills, setSkills] = useState(
+      initial?.skills || [50, 50, 50, 50, 50, 50],
+    ),
+    [photo, setPhoto] = useState(initial?.photo || ""),
+    [uploading, setUploading] = useState(false);
+  const upload = async (file: File) => {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      onError("请选择 JPG、PNG 或 WebP 图片");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      onError("原图请小于 10MB");
+      return;
+    }
+    setUploading(true);
+    try {
+      const bitmap = await createImageBitmap(file);
+      const canvas = document.createElement("canvas");
+      const ratio = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
+      canvas.width = bitmap.width * ratio;
+      canvas.height = bitmap.height * ratio;
+      canvas
+        .getContext("2d")!
+        .drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      const blob = await new Promise<Blob>((res, rej) =>
+        canvas.toBlob((x) => (x ? res(x) : rej(Error())), "image/jpeg", 0.85),
+      );
+      const r = await apiFetch("/api/photos", { method: "POST", body: blob });
+      const b: any = await r.json();
+      if (!r.ok) throw Error(b.error);
+      setPhoto(b.url);
+    } catch {
+      onError("头像上传失败，请重试");
+    } finally {
+      setUploading(false);
+    }
+  };
+  return (
+    <form
+      className="entity-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        onSave({
+          name: f.get("name"),
+          nickname: f.get("nickname"),
+          teamIds,
+          number: Number(f.get("number")),
+          position: f.get("position"),
+          value: Number(f.get("value")),
+          bio: f.get("bio"),
+          photo,
+          skills,
+        });
+      }}
+    >
+      <div className="photo-upload">
+        <span className="upload-avatar">
+          {photo ? (
+            <img src={photoUrl(photo)} alt="头像预览" />
+          ) : (
+            <UserRound size={32} />
+          )}
+        </span>
+        <div>
+          <label className="btn secondary upload-button">
+            <Upload size={15} />
+            {uploading ? "上传中…" : "上传球员头像"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={uploading}
+              onChange={(e) => {
+                if (e.target.files?.[0]) upload(e.target.files[0]);
+              }}
+            />
+          </label>
+          <p className="help-text">JPG / PNG / WebP，原图不超过 10MB</p>
+          {photo && (
+            <button
+              type="button"
+              className="text-btn"
+              onClick={() => setPhoto("")}
+            >
+              移除头像
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="form-grid">
+        <label>
+          球员姓名 <em>*</em>
+          <input
+            name="name"
+            defaultValue={initial?.name}
+            maxLength={30}
+            required
+            placeholder="球员姓名"
+          />
+        </label>
+        <label>
+          昵称
+          <input
+            name="nickname"
+            defaultValue={initial?.nickname}
+            maxLength={30}
+            placeholder="球场上的专属称号"
+          />
+        </label>
+        <fieldset className="membership-field">
+          <legend>
+            所属球队（可多选） <em>*</em>
+          </legend>
+          <p className="help-text">
+            至少选择一支球队；同一球员可代表不同球队参加不同比赛。
+          </p>
+          <div className="membership-options">
+            {teams.map((t) => (
+              <label className="membership-option" key={t.id}>
+                <input
+                  type="checkbox"
+                  checked={teamIds.includes(t.id)}
+                  onChange={(e) =>
+                    setTeamIds(
+                      e.target.checked
+                        ? [...teamIds, t.id]
+                        : teamIds.filter((id) => id !== t.id),
+                    )
+                  }
+                />
+                <Badge team={t} />
+                <span>{t.name}</span>
+              </label>
+            ))}
+          </div>
+          {teamIds.length === 0 && (
+            <p className="help-text membership-error">请选择至少一支球队。</p>
+          )}
+        </fieldset>
+        <label>
+          球衣号码 <em>*</em>
+          <input
+            name="number"
+            type="number"
+            min="0"
+            max="99"
+            defaultValue={initial?.number ?? 1}
+            required
+          />
+        </label>
+        <label>
+          场上位置
+          <select name="position" defaultValue={initial?.position || "全能型"}>
+            {["前锋", "后卫", "守门员", "全能型"].map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          身价（万G币）
+          <input
+            name="value"
+            type="number"
+            min="0"
+            max="1000000"
+            step="0.1"
+            defaultValue={initial?.value ?? 0}
+            required
+          />
+        </label>
+      </div>
+      <div className="ability-editor">
+        <div>
+          <h3>六维能力</h3>
+          <p className="help-text">
+            手动评定，范围 0–100。新球员默认值 50 可调整；身价为联赛虚拟估值。
+          </p>
+          <div className="sliders">
+            {dimensions.map((d, i) => (
+              <label key={d}>
+                <span>{d}</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={skills[i]}
+                  onChange={(e) =>
+                    setSkills(
+                      skills.map((v, j) =>
+                        i === j ? Number(e.target.value) : v,
+                      ),
+                    )
+                  }
+                />
+                <b>{skills[i]}</b>
+              </label>
+            ))}
+          </div>
+        </div>
+        <Radar skills={skills} small />
+      </div>
+      <label>
+        球员画像 / 个人介绍
+        <textarea
+          name="bio"
+          defaultValue={initial?.bio}
+          rows={3}
+          maxLength={500}
+          placeholder="擅长的打法、招牌动作、球场性格…"
+        />
+      </label>
+      <div className="form-footer">
+        <span className="help-text">
+          所属球队可多选；修改资料不会改变历史比赛的出场与进球归属。
+        </span>
+        <button
+          className="btn primary"
+          disabled={busy || uploading || teamIds.length === 0}
+        >
+          {busy ? "保存中…" : "保存球员档案"}
+          <Check size={16} />
+        </button>
+      </div>
+    </form>
+  );
+}
+function MatchKindPicker({
+  kind,
+  onChange,
+  locked = false,
+}: {
+  kind: "regular" | "pickup";
+  onChange: (kind: "regular" | "pickup") => void;
+  locked?: boolean;
+}) {
+  return (
+    <div className="match-kind-picker">
+      <div role="group" aria-label="比赛组队方式">
+        <button
+          type="button"
+          disabled={locked}
+          aria-pressed={kind === "regular"}
+          className={kind === "regular" ? "selected" : ""}
+          onClick={() => onChange("regular")}
+        >
+          <Trophy size={17} />
+          <span>
+            <b>常驻队比赛</b>
+            <small>计入球队积分与个人榜单</small>
+          </span>
+        </button>
+        <button
+          type="button"
+          disabled={locked}
+          aria-pressed={kind === "pickup"}
+          className={kind === "pickup" ? "selected" : ""}
+          onClick={() => onChange("pickup")}
+        >
+          <Users size={17} />
+          <span>
+            <b>临时组队</b>
+            <small>队伍A / 队伍B · 仅计个人榜单</small>
+          </span>
+        </button>
+      </div>
+      {kind === "pickup" && (
+        <p>可从全部球员中自由混搭，不改变球员的常驻球队归属。</p>
+      )}
+    </div>
+  );
+}
+function MatchForm({
+  initial,
+  teams,
+  players,
+  busy,
+  onSave,
+}: {
+  initial?: Match;
+  teams: Team[];
+  players: Player[];
+  busy: boolean;
+  onSave: (d: any) => void;
+}) {
+  const [kind, setKind] = useState<"regular" | "pickup">(
+    initial?.kind || (teams.length >= 2 ? "regular" : "pickup"),
+  );
+  const [home, setHome] = useState(initial?.homeId || teams[0]?.id || ""),
+    [away, setAway] = useState(initial?.awayId || teams[1]?.id || ""),
+    [homePlayers, setHomePlayers] = useState<string[]>(
+      initial?.homePlayers || [],
+    ),
+    [awayPlayers, setAwayPlayers] = useState<string[]>(
+      initial?.awayPlayers || [],
+    );
+  return (
+    <form
+      className="entity-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        onSave({
+          kind,
+          homeId: home,
+          awayId: away,
+          homePlayers,
+          awayPlayers,
+          time: new Date(`${f.get("time")}:00+08:00`).toISOString(),
+          round: f.get("round"),
+        });
+      }}
+    >
+      <MatchKindPicker
+        kind={kind}
+        locked={!!initial}
+        onChange={(k) => {
+          setKind(k);
+          setHomePlayers([]);
+          setAwayPlayers([]);
+        }}
+      />
+      <div className="form-grid">
+        <label>
+          轮次 / 比赛名称 <em>*</em>
+          <input
+            name="round"
+            defaultValue={initial?.round || "友谊对决"}
+            maxLength={30}
+            required
+          />
+        </label>
+        <label>
+          比赛时间（北京时间） <em>*</em>
+          <input
+            type="datetime-local"
+            name="time"
+            defaultValue={dateInput(initial?.time)}
+            required
+          />
+        </label>
+      </div>
+      <div className="form-grid roster-select">
+        {[
+          {
+            label: kind === "pickup" ? "队伍A" : "主队",
+            value: home,
+            set: setHome,
+            other: away,
+            selected: homePlayers,
+            setSelected: setHomePlayers,
+            opposite: awayPlayers,
+          },
+          {
+            label: kind === "pickup" ? "队伍B" : "客队",
+            value: away,
+            set: setAway,
+            other: home,
+            selected: awayPlayers,
+            setSelected: setAwayPlayers,
+            opposite: homePlayers,
+          },
+        ].map((x) => (
+          <div key={x.label}>
+            {kind === "pickup" ? (
+              <div className="pickup-team-name">
+                {x.label}
+                <span>本场临时阵容</span>
+              </div>
+            ) : (
+              <label>
+                {x.label} <em>*</em>
+                <select
+                  value={x.value}
+                  onChange={(e) => {
+                    x.set(e.target.value);
+                    x.setSelected([]);
+                  }}
+                  required
+                >
+                  <option value="">选择常驻球队</option>
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id} disabled={t.id === x.other}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <p className="help-text">选择出场球员（1–4 人）</p>
+            <div className="roster-options">
+              {players
+                .filter((p) => kind === "pickup" || isTeamMember(p, x.value))
+                .map((p) => (
+                  <label className="check-player" key={p.id}>
+                    <input
+                      type="checkbox"
+                      disabled={x.opposite.includes(p.id)}
+                      checked={x.selected.includes(p.id)}
+                      onChange={(e) =>
+                        x.setSelected(
+                          e.target.checked
+                            ? [...x.selected, p.id]
+                            : x.selected.filter((id) => id !== p.id),
+                        )
+                      }
+                    />
+                    <Avatar player={p} />
+                    <span>
+                      {p.name}
+                      {x.opposite.includes(p.id) && (
+                        <small className="opponent-note">已代表对方出场</small>
+                      )}
+                    </span>
+                    <small>#{p.number}</small>
+                  </label>
+                ))}
+              {!players.some(
+                (p) => kind === "pickup" || isTeamMember(p, x.value),
+              ) && <p className="help-text">暂无可选球员，请先登记球员。</p>}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="form-footer">
+        <span className="help-text">
+          同一场比赛，每位球员只能代表一方出场。
+        </span>
+        <button
+          className="btn primary"
+          disabled={
+            busy ||
+            (kind === "regular" && (!home || !away || home === away)) ||
+            homePlayers.length < 1 ||
+            awayPlayers.length < 1 ||
+            homePlayers.length > 4 ||
+            awayPlayers.length > 4 ||
+            homePlayers.some((id) => awayPlayers.includes(id))
+          }
+        >
+          {busy ? "保存中…" : initial ? "保存赛程" : "创建比赛"}
+          <ArrowRight size={16} />
+        </button>
+      </div>
+    </form>
+  );
+}
+function GoalForm({
+  match,
+  teamId,
+  teams,
+  players,
+  busy,
+  onSave,
+}: {
+  match: Match;
+  teamId: string;
+  teams: Team[];
+  players: Player[];
+  busy: boolean;
+  onSave: (d: any) => void;
+}) {
+  const [ownGoal, setOwnGoal] = useState(false),
+    [playerId, setPlayerId] = useState(""),
+    [id] = useState(uid);
+  const ids =
+    (teamId === match.homeId) !== ownGoal
+      ? match.homePlayers
+      : match.awayPlayers;
+  return (
+    <form
+      className="entity-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        onSave({
+          id,
+          teamId,
+          playerId,
+          ownGoal,
+          minute: Number(f.get("minute")),
+        });
+      }}
+    >
+      <div className="goal-form-team">
+        <Badge team={matchTeam(teams, match, teamId)} />
+        <span>
+          <b>{matchTeam(teams, match, teamId)?.name}</b> 获得 1 分
+        </span>
+      </div>
+      <label className="checkbox-label">
+        <input
+          type="checkbox"
+          checked={ownGoal}
+          onChange={(e) => {
+            setOwnGoal(e.target.checked);
+            setPlayerId("");
+          }}
+        />
+        这是对方乌龙球
+      </label>
+      <label>
+        {ownGoal ? "乌龙球球员（对方）" : "进球球员"}
+        <select
+          value={playerId}
+          onChange={(e) => setPlayerId(e.target.value)}
+          required={ownGoal}
+        >
+          <option value="">
+            {ownGoal ? "请选择对方球员" : "暂不指定球员"}
+          </option>
+          {players
+            .filter((p) => ids.includes(p.id))
+            .map((p) => (
+              <option key={p.id} value={p.id}>
+                #{p.number} {p.name}
+              </option>
+            ))}
+        </select>
+      </label>
+      <label>
+        进球发生于第几分钟
+        <input
+          name="minute"
+          type="number"
+          min="0"
+          max="999"
+          defaultValue={match.goals.at(-1)?.minute || 0}
+          required
+        />
+      </label>
+      <p className="help-text">
+        未指定球员时只计入球队比分。乌龙球独立保存。记错后可在时间线撤销并重新登记。
+      </p>
+      <div className="form-footer">
+        <span>比分与比赛统计将同步更新</span>
+        <button className="btn primary" disabled={busy}>
+          {busy ? "正在记分…" : "确认进球"}
+          <Goal size={16} />
+        </button>
+      </div>
+    </form>
+  );
+}
 
-function ResultForm({initial,teams,players,busy,onSave}:{initial?:Match;teams:Team[];players:Player[];busy:boolean;onSave:(d:any)=>void}){
- const [kind,setKind]=useState<'regular'|'pickup'>(initial?.kind||(teams.length>=2?'regular':'pickup'));
- const [resultId]=useState(uid),[home,setHome]=useState(initial?.homeId||teams[0]?.id||''),[away,setAway]=useState(initial?.awayId||teams[1]?.id||'');
- const eligible=(id:string,side:'home'|'away')=>players.filter(p=>kind==='pickup'||isTeamMember(p,id)||(initial&&(side==='home'?initial.homePlayers:initial.awayPlayers).includes(p.id)));
- const defaults=(id:string,side:'home'|'away')=>{const candidates=eligible(id,side);const roster=initial?(side==='home'?initial.homePlayers:initial.awayPlayers):[];const choices=roster.length?candidates.filter(p=>roster.includes(p.id)):candidates;const f=choices.find(p=>p.position==='前锋')||choices[0];const d=choices.find(p=>p.id!==f?.id&&p.position==='后卫')||choices.find(p=>p.id!==f?.id);return [f?.id||'',d?.id||'']};
- const [homeForwardId,setHF]=useState(initial?.summary?.homeForwardId||defaults(home,'home')[0]),[homeDefenderId,setHD]=useState(initial?.summary?.homeDefenderId||defaults(home,'home')[1]),[awayForwardId,setAF]=useState(initial?.summary?.awayForwardId||defaults(away,'away')[0]),[awayDefenderId,setAD]=useState(initial?.summary?.awayDefenderId||defaults(away,'away')[1]);
- const [homeScore,setHS]=useState(initial?String(score(initial)[0]):''),[awayScore,setAS]=useState(initial?String(score(initial)[1]):''),[replaceDetailed,setReplace]=useState(false);
- const ids=[homeForwardId,homeDefenderId,awayForwardId,awayDefenderId],duplicate=ids.filter(Boolean).length!==new Set(ids.filter(Boolean)).size;
- const valid=ids.every(Boolean)&&!duplicate&&(kind==='pickup'||(!!home&&!!away&&home!==away))&&homeScore!==''&&awayScore!==''&&(!initial?.goals.length||replaceDetailed);
- const sideData=[{side:'home' as const,label:kind==='pickup'?'队伍A':'主队',id:home,set:setHome,forward:homeForwardId,setForward:setHF,defender:homeDefenderId,setDefender:setHD,score:homeScore,setScore:setHS,other:away},{side:'away' as const,label:kind==='pickup'?'队伍B':'客队',id:away,set:setAway,forward:awayForwardId,setForward:setAF,defender:awayDefenderId,setDefender:setAD,score:awayScore,setScore:setAS,other:home}];
- return <form className="entity-form result-form" onSubmit={e=>{e.preventDefault();if(!valid)return;const f=new FormData(e.currentTarget);onSave({resultId,kind,homeId:home,awayId:away,homeScore:Number(homeScore),awayScore:Number(awayScore),homeForwardId,homeDefenderId,awayForwardId,awayDefenderId,round:f.get('round'),time:new Date(`${f.get('time')}:00+08:00`).toISOString(),replaceDetailed})}}>
- <MatchKindPicker kind={kind} locked={!!initial} onChange={k=>{setKind(k);setHF('');setHD('');setAF('');setAD('')}}/>
- <div className="result-form-note"><CheckCircle2 size={18}/><p>填写最终比分，保存后直接完赛。双方各指定一位前锋和一位后卫。</p></div>
- <div className="form-grid"><label>轮次 / 比赛名称 <em>*</em><input name="round" defaultValue={initial?.round||'常规赛'} maxLength={30} required/></label><label>比赛时间（北京时间） <em>*</em><input type="datetime-local" name="time" defaultValue={dateInput(initial?.time)} required/></label></div>
- <div className="result-sides">{sideData.map(x=><section className="result-side" key={x.side}><label>{x.label}{kind==='pickup'?<div className="pickup-team-name">{x.label}<span>全体球员自由组合</span></div>:<select aria-label={`${x.label}球队`} disabled={!!initial} value={x.id} onChange={e=>{const id=e.target.value;x.set(id);const d=defaults(id,x.side);x.setForward(d[0]);x.setDefender(d[1])}}>{teams.map(t=><option key={t.id} value={t.id} disabled={t.id===x.other}>{t.name}</option>)}</select>}</label><label className="final-score-label">最终进球数 <em>*</em><input aria-label={`${x.label}最终比分`} type="number" min="0" max="999" step="1" inputMode="numeric" placeholder="0" value={x.score} onChange={e=>x.setScore(e.target.value)} required/></label><label>本场前锋 <em>*</em><select aria-label={`${x.label}前锋`} value={x.forward} onChange={e=>x.setForward(e.target.value)} required><option value="">选择前锋</option>{eligible(x.id,x.side).map(p=><option key={p.id} value={p.id}>#{p.number} {p.name}</option>)}</select></label><label>本场后卫 <em>*</em><select aria-label={`${x.label}后卫`} value={x.defender} onChange={e=>x.setDefender(e.target.value)} required><option value="">选择后卫</option>{eligible(x.id,x.side).map(p=><option key={p.id} value={p.id}>#{p.number} {p.name}</option>)}</select></label>{eligible(x.id,x.side).length<2&&<p className="help-text membership-error">每方至少需要两名球员；临时组队从全部已登记球员中选择。</p>}</section>)}</div>
- {duplicate&&<p className="help-text membership-error">四个位置须选择不同球员，请调整重复人选。</p>}
- <div className="allocation-preview"><h3>本场自动结算</h3>{sideData.map((x,i)=>{const goal=Number(x.score||0),opponent=Number((i===0?awayScore:homeScore)||0);return <div key={x.side}><b>{kind==='pickup'?x.label:teams.find(t=>t.id===x.id)?.name}</b><span>前锋 {players.find(p=>p.id===x.forward)?.name||'待选择'}：<strong>{goal}</strong> 进球</span><span>后卫 {players.find(p=>p.id===x.defender)?.name||'待选择'}：<strong>{signed(goal-opponent)}</strong> 防守球</span></div>})}<p>{kind==='pickup'?'本场不计球队积分，仅累计个人进球和防守球。':'本场同时结算球队积分与个人榜单。'}防守球计有正负的分差，平局记 0；场均防守按个人防守场次计算。</p></div>
- {initial&&initial.goals.length>0&&<label className="checkbox-label result-replace"><input type="checkbox" checked={replaceDetailed} onChange={e=>setReplace(e.target.checked)} required/><span>确认替换本场原有的 {initial.goals.length} 条逐球记录，全部进球改计给所选前锋。</span></label>}
- <div className="form-footer"><span className="help-text">出场阵容以本次前锋、后卫为准。再次保存会替换结果，不会重复累计。</span><button className="btn primary" disabled={busy||!valid}>{busy?'正在结算…':'保存结果并结算'}<Check size={16}/></button></div>
- </form>
+function ResultForm({
+  initial,
+  teams,
+  players,
+  busy,
+  onSave,
+}: {
+  initial?: Match;
+  teams: Team[];
+  players: Player[];
+  busy: boolean;
+  onSave: (d: any) => void;
+}) {
+  const [kind, setKind] = useState<"regular" | "pickup">(
+    initial?.kind || (teams.length >= 2 ? "regular" : "pickup"),
+  );
+  const [resultId] = useState(uid),
+    [home, setHome] = useState(initial?.homeId || teams[0]?.id || ""),
+    [away, setAway] = useState(initial?.awayId || teams[1]?.id || "");
+  const eligible = (id: string, side: "home" | "away") =>
+    players.filter(
+      (p) =>
+        kind === "pickup" ||
+        isTeamMember(p, id) ||
+        (initial &&
+          (side === "home"
+            ? initial.homePlayers
+            : initial.awayPlayers
+          ).includes(p.id)),
+    );
+  const defaults = (id: string, side: "home" | "away") => {
+    const candidates = eligible(id, side);
+    const roster = initial
+      ? side === "home"
+        ? initial.homePlayers
+        : initial.awayPlayers
+      : [];
+    const choices = roster.length
+      ? candidates.filter((p) => roster.includes(p.id))
+      : candidates;
+    const f = choices.find((p) => p.position === "前锋") || choices[0];
+    const d =
+      choices.find((p) => p.id !== f?.id && p.position === "后卫") ||
+      choices.find((p) => p.id !== f?.id);
+    return [f?.id || "", d?.id || ""];
+  };
+  const [homeForwardId, setHF] = useState(
+      initial?.summary?.homeForwardId || defaults(home, "home")[0],
+    ),
+    [homeDefenderId, setHD] = useState(
+      initial?.summary?.homeDefenderId || defaults(home, "home")[1],
+    ),
+    [awayForwardId, setAF] = useState(
+      initial?.summary?.awayForwardId || defaults(away, "away")[0],
+    ),
+    [awayDefenderId, setAD] = useState(
+      initial?.summary?.awayDefenderId || defaults(away, "away")[1],
+    );
+  const [homeScore, setHS] = useState(initial ? String(score(initial)[0]) : ""),
+    [awayScore, setAS] = useState(initial ? String(score(initial)[1]) : ""),
+    [replaceDetailed, setReplace] = useState(false);
+  const ids = [homeForwardId, homeDefenderId, awayForwardId, awayDefenderId],
+    duplicate =
+      ids.filter(Boolean).length !== new Set(ids.filter(Boolean)).size;
+  const valid =
+    ids.every(Boolean) &&
+    !duplicate &&
+    (kind === "pickup" || (!!home && !!away && home !== away)) &&
+    homeScore !== "" &&
+    awayScore !== "" &&
+    (!initial?.goals.length || replaceDetailed);
+  const sideData = [
+    {
+      side: "home" as const,
+      label: kind === "pickup" ? "队伍A" : "主队",
+      id: home,
+      set: setHome,
+      forward: homeForwardId,
+      setForward: setHF,
+      defender: homeDefenderId,
+      setDefender: setHD,
+      score: homeScore,
+      setScore: setHS,
+      other: away,
+    },
+    {
+      side: "away" as const,
+      label: kind === "pickup" ? "队伍B" : "客队",
+      id: away,
+      set: setAway,
+      forward: awayForwardId,
+      setForward: setAF,
+      defender: awayDefenderId,
+      setDefender: setAD,
+      score: awayScore,
+      setScore: setAS,
+      other: home,
+    },
+  ];
+  return (
+    <form
+      className="entity-form result-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!valid) return;
+        const f = new FormData(e.currentTarget);
+        onSave({
+          resultId,
+          kind,
+          homeId: home,
+          awayId: away,
+          homeScore: Number(homeScore),
+          awayScore: Number(awayScore),
+          homeForwardId,
+          homeDefenderId,
+          awayForwardId,
+          awayDefenderId,
+          round: f.get("round"),
+          time: new Date(`${f.get("time")}:00+08:00`).toISOString(),
+          replaceDetailed,
+        });
+      }}
+    >
+      <MatchKindPicker
+        kind={kind}
+        locked={!!initial}
+        onChange={(k) => {
+          setKind(k);
+          setHF("");
+          setHD("");
+          setAF("");
+          setAD("");
+        }}
+      />
+      <div className="result-form-note">
+        <CheckCircle2 size={18} />
+        <p>填写最终比分，保存后直接完赛。双方各指定一位前锋和一位后卫。</p>
+      </div>
+      <div className="form-grid">
+        <label>
+          轮次 / 比赛名称 <em>*</em>
+          <input
+            name="round"
+            defaultValue={initial?.round || "常规赛"}
+            maxLength={30}
+            required
+          />
+        </label>
+        <label>
+          比赛时间（北京时间） <em>*</em>
+          <input
+            type="datetime-local"
+            name="time"
+            defaultValue={dateInput(initial?.time)}
+            required
+          />
+        </label>
+      </div>
+      <div className="result-sides">
+        {sideData.map((x) => (
+          <section className="result-side" key={x.side}>
+            <label>
+              {x.label}
+              {kind === "pickup" ? (
+                <div className="pickup-team-name">
+                  {x.label}
+                  <span>全体球员自由组合</span>
+                </div>
+              ) : (
+                <select
+                  aria-label={`${x.label}球队`}
+                  disabled={!!initial}
+                  value={x.id}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    x.set(id);
+                    const d = defaults(id, x.side);
+                    x.setForward(d[0]);
+                    x.setDefender(d[1]);
+                  }}
+                >
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id} disabled={t.id === x.other}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </label>
+            <label className="final-score-label">
+              最终进球数 <em>*</em>
+              <input
+                aria-label={`${x.label}最终比分`}
+                type="number"
+                min="0"
+                max="999"
+                step="1"
+                inputMode="numeric"
+                placeholder="0"
+                value={x.score}
+                onChange={(e) => x.setScore(e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              本场前锋 <em>*</em>
+              <select
+                aria-label={`${x.label}前锋`}
+                value={x.forward}
+                onChange={(e) => x.setForward(e.target.value)}
+                required
+              >
+                <option value="">选择前锋</option>
+                {eligible(x.id, x.side).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    #{p.number} {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              本场后卫 <em>*</em>
+              <select
+                aria-label={`${x.label}后卫`}
+                value={x.defender}
+                onChange={(e) => x.setDefender(e.target.value)}
+                required
+              >
+                <option value="">选择后卫</option>
+                {eligible(x.id, x.side).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    #{p.number} {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {eligible(x.id, x.side).length < 2 && (
+              <p className="help-text membership-error">
+                每方至少需要两名球员；临时组队从全部已登记球员中选择。
+              </p>
+            )}
+          </section>
+        ))}
+      </div>
+      {duplicate && (
+        <p className="help-text membership-error">
+          四个位置须选择不同球员，请调整重复人选。
+        </p>
+      )}
+      <div className="allocation-preview">
+        <h3>本场自动结算</h3>
+        {sideData.map((x, i) => {
+          const goal = Number(x.score || 0),
+            opponent = Number((i === 0 ? awayScore : homeScore) || 0);
+          return (
+            <div key={x.side}>
+              <b>
+                {kind === "pickup"
+                  ? x.label
+                  : teams.find((t) => t.id === x.id)?.name}
+              </b>
+              <span>
+                前锋 {players.find((p) => p.id === x.forward)?.name || "待选择"}
+                时球队得分：<strong>{goal}</strong>
+              </span>
+              <span>
+                后卫{" "}
+                {players.find((p) => p.id === x.defender)?.name || "待选择"}：
+                <strong>{signed(goal - opponent)}</strong> 球队净胜球
+              </span>
+            </div>
+          );
+        })}
+        <p>
+          {kind === "pickup"
+            ? "本场计入个人表现、搭档数据与 Elo，不计常驻队积分。"
+            : "本场同时结算球队积分与个人榜单。"}
+          球队得分不等于个人进球；各位置表现按本场指定角色统计。
+        </p>
+      </div>
+      {initial && initial.goals.length > 0 && (
+        <label className="checkbox-label result-replace">
+          <input
+            type="checkbox"
+            checked={replaceDetailed}
+            onChange={(e) => setReplace(e.target.checked)}
+            required
+          />
+          <span>
+            确认替换本场原有的 {initial.goals.length}{" "}
+            条逐球记录，改为保存球队比分与双方位置。
+          </span>
+        </label>
+      )}
+      <div className="form-footer">
+        <span className="help-text">
+          出场阵容以本次前锋、后卫为准。再次保存会替换结果，不会重复累计。
+        </span>
+        <button className="btn primary" disabled={busy || !valid}>
+          {busy ? "正在结算…" : "保存结果并结算"}
+          <Check size={16} />
+        </button>
+      </div>
+    </form>
+  );
 }
