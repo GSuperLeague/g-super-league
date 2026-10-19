@@ -4,7 +4,7 @@
   "compatibility_date": "2026-05-15",
   "workers_dev": true,
   "vars": {
-    "ALLOWED_ORIGINS": "https://junjieyu28.github.io,http://localhost:5173"
+    "ALLOWED_ORIGINS": "https://gsuperleague.github.io,https://junjieyu28.github.io,http://localhost:5173"
   },
   "d1_databases": [
     {
