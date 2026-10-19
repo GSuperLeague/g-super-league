@@ -1,4 +1,4 @@
-import { score } from "./league.ts";
+import { score, matchRoles } from "./league.ts";
 import type { League, Match, Player } from "./league.ts";
 
 export type Role = "overall" | "forward" | "defender";
@@ -184,7 +184,7 @@ export function analyzeLeague(league: League): Analytics {
       new Set(rosters.flat()).size !== rosters.flat().length
     )
       continue;
-    const summary = match.summary;
+    const summary = matchRoles(match);
     const roles = summary
       ? [
           summary.homeForwardId,
@@ -364,7 +364,7 @@ export function swapComparisons(data: Analytics): SwapComparison[] {
   >();
   for (const pair of data.positionPairs) {
     for (const match of pair.matches) {
-      const s = match.summary!;
+      const s = matchRoles(match)!;
       const home = s.homeForwardId === pair.forwardId;
       const opponents: [string, string] = home
         ? [s.awayForwardId, s.awayDefenderId]

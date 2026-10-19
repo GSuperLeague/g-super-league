@@ -5,8 +5,9 @@ export type Player = {id:string;name:string;nickname:string;teamIds?:string[];te
 export function playerTeamIds(p:Pick<Player,'teamIds'|'teamId'>):string[]{return Array.isArray(p.teamIds)?[...new Set(p.teamIds)]:p.teamId?[p.teamId]:[]}
 export function isTeamMember(p:Player,teamId:string){return playerTeamIds(p).includes(teamId)}
 export type Goal={id:string;teamId:string;playerId:string;ownGoal:boolean;minute:number;createdAt:string};
+export type MatchRoles={homeForwardId:string;homeDefenderId:string;awayForwardId:string;awayDefenderId:string};
 export type MatchSummary={homeScore:number;awayScore:number;homeForwardId:string;homeDefenderId:string;awayForwardId:string;awayDefenderId:string;recordedAt:string};
-export type Match={id:string;kind?:'regular'|'pickup';homeId:string;awayId:string;homePlayers:string[];awayPlayers:string[];time:string;round:string;status:'scheduled'|'live'|'finished';goals:Goal[];summary?:MatchSummary};
+export type Match={id:string;kind?:'regular'|'pickup';homeId:string;awayId:string;homePlayers:string[];awayPlayers:string[];time:string;round:string;status:'scheduled'|'live'|'finished';goals:Goal[];roles?:MatchRoles;summary?:MatchSummary};
 export function matchTeam(teams:Team[],match:Match,id:string):Team|undefined{
  if(match.kind==='pickup'&&(id===match.homeId||id===match.awayId)){const home=id===match.homeId;return {id,name:home?'队伍A':'队伍B',short:home?'A':'B',color:home?'#365c49':'#275e9b',bio:'本场临时组队'}}
  return teams.find(t=>t.id===id);
@@ -15,25 +16,31 @@ export type League={teams:Team[];players:Player[];matches:Match[];settings:{seas
 export const emptyLeague=():League=>({teams:[],players:[],matches:[],settings:{season:'2026 赛季',win:3,draw:1,loss:0},updatedAt:''});
 export function score(m:Match){if(m.summary)return [m.summary.homeScore,m.summary.awayScore];return [m.goals.filter(g=>g.teamId===m.homeId).length,m.goals.filter(g=>g.teamId===m.awayId).length]}
 export function standings(s:League){return s.teams.map(t=>{const r={...t,played:0,win:0,draw:0,loss:0,gf:0,ga:0,gd:0,points:0};s.matches.filter(m=>m.status==='finished'&&m.kind!=='pickup'&&(m.homeId===t.id||m.awayId===t.id)).forEach(m=>{const v=score(m);const a=m.homeId===t.id?v[0]:v[1],b=m.homeId===t.id?v[1]:v[0];r.played++;r.gf+=a;r.ga+=b;if(a>b)r.win++;else if(a===b)r.draw++;else r.loss++});r.gd=r.gf-r.ga;r.points=r.win*s.settings.win+r.draw*s.settings.draw+r.loss*s.settings.loss;return r}).sort((a,b)=>b.points-a.points||b.gd-a.gd||b.gf-a.gf||a.name.localeCompare(b.name,'zh'))}
+export function matchRoles(m:Match):MatchRoles|undefined{return m.summary||m.roles}
+export function playerGoals(m:Match,id:string){return m.summary?(m.summary.homeForwardId===id?m.summary.homeScore:0)+(m.summary.awayForwardId===id?m.summary.awayScore:0):m.goals.filter(g=>g.playerId===id&&!g.ownGoal).length}
 export function scorers(s:League){return s.players.map(p=>{
  const ms=s.matches.filter(m=>m.status!=='scheduled'&&(m.homePlayers.includes(p.id)||m.awayPlayers.includes(p.id)));
- const goals=ms.reduce((total,m)=>total+(m.summary?(m.summary.homeForwardId===p.id?m.summary.homeScore:0)+(m.summary.awayForwardId===p.id?m.summary.awayScore:0):m.goals.filter(g=>g.playerId===p.id&&!g.ownGoal).length),0);
- // Use only recorded match roles. Current player position cannot reconstruct historical roles.
- const forwardMatches=ms.filter(m=>m.status==='finished'&&m.summary&&(m.summary.homeForwardId===p.id||m.summary.awayForwardId===p.id));
- const forwardGoals=forwardMatches.reduce((total,m)=>total+(m.summary!.homeForwardId===p.id?m.summary!.homeScore:m.summary!.awayScore),0);
+ const goals=ms.reduce((total,m)=>total+playerGoals(m,p.id),0);
+ const forwardMatches=ms.filter(m=>{const r=matchRoles(m);return m.status==='finished'&&r&&(r.homeForwardId===p.id||r.awayForwardId===p.id)});
+ const forwardGoals=forwardMatches.reduce((total,m)=>total+playerGoals(m,p.id),0);
  const forwardGames=forwardMatches.length;
  return {...p,goals,appearances:ms.length,forwardGames,forwardGoals,average:forwardGames?forwardGoals/forwardGames:null};
  }).sort((a,b)=>b.goals-a.goals||(a.forwardGames||Infinity)-(b.forwardGames||Infinity)||a.name.localeCompare(b.name,'zh'));
 }
-
-export function defenders(s:League){
- return s.players.map(p=>{
-  const matches=s.matches.filter(m=>m.status==='finished'&&m.summary&&(m.summary.homeDefenderId===p.id||m.summary.awayDefenderId===p.id));
-  let goalsFor=0,goalsAgainst=0,defensiveGoals=0;
-  for(const m of matches){const r=m.summary!;const home=r.homeDefenderId===p.id;goalsFor+=home?r.homeScore:r.awayScore;goalsAgainst+=home?r.awayScore:r.homeScore;defensiveGoals+=home?r.homeScore-r.awayScore:r.awayScore-r.homeScore}
-  return {...p,defensiveGames:matches.length,defensiveGoals,goalsFor,goalsAgainst,averageDefense:matches.length?defensiveGoals/matches.length:0};
+export function defenders(s:League){return s.players.map(p=>{
+ const matches=s.matches.filter(m=>{const r=matchRoles(m);return m.status==='finished'&&r&&(r.homeDefenderId===p.id||r.awayDefenderId===p.id)});
+ let goalsFor=0,goalsAgainst=0,defensiveGoals=0;
+ for(const m of matches){const r=matchRoles(m)!;const home=r.homeDefenderId===p.id;const [a,b]=score(m);goalsFor+=home?a:b;goalsAgainst+=home?b:a;defensiveGoals+=home?a-b:b-a}
+ return {...p,defensiveGames:matches.length,defensiveGoals,goalsFor,goalsAgainst,averageDefense:matches.length?defensiveGoals/matches.length:0};
  }).filter(p=>p.defensiveGames>0).sort((a,b)=>b.defensiveGoals-a.defensiveGoals||b.averageDefense-a.averageDefense||b.defensiveGames-a.defensiveGames||a.name.localeCompare(b.name,'zh'));
 }
+// Only explicit goal events can establish an own goal; aggregate scores cannot.
+export function ownGoalEvents(s:League){return s.matches.filter(m=>m.status!=='scheduled'&&!m.summary).flatMap(match=>match.goals.filter(goal=>goal.ownGoal).map(goal=>({match,goal}))).sort((a,b)=>b.goal.createdAt.localeCompare(a.goal.createdAt)||b.goal.id.localeCompare(a.goal.id))}
+export function ownGoalRankings(s:League){const events=ownGoalEvents(s);return s.players.map(player=>{
+ const own=events.filter(e=>e.goal.playerId===player.id);
+ const games=s.matches.filter(m=>m.status!=='scheduled'&&!m.summary&&(m.homePlayers.includes(player.id)||m.awayPlayers.includes(player.id))).length;
+ return {...player,ownGoals:own.length,affectedMatches:new Set(own.map(e=>e.match.id)).size,detailedGames:games,average:games?own.length/games:0};
+ }).filter(p=>p.ownGoals>0).sort((a,b)=>b.ownGoals-a.ownGoals||a.name.localeCompare(b.name,'zh'))}
 
 const fail=(message:string):never=>{throw new Error(message)};
 const str=(x:unknown,max=80,required=false)=>{if(typeof x!=='string'||x.length>max||(required&&!x.trim()))return fail('请检查必填文字及长度');return x.trim()};
@@ -72,7 +79,14 @@ export function applyAction(s:League,a:any):League{
   const {kind,homeId,awayId}=matchIdentity(s,id,p,old);
   const time=str(p.time,50,true);if(!Number.isFinite(Date.parse(time)))fail('比赛时间无效');
   function roster(key:string,team:string){if(!Array.isArray(p[key])||p[key].length<1||p[key].length>4)fail('每队请选择 1–4 位出场球员');const ids=[...new Set(p[key])] as string[];if(!ids.every(x=>s.players.some(y=>y.id===x&&(kind==='pickup'||isTeamMember(y,team)))))fail('出场球员必须属于本队');return ids}
-  const m:Match={id,kind,homeId,awayId,time,round:str(p.round,30,true),homePlayers:roster('homePlayers',homeId),awayPlayers:roster('awayPlayers',awayId),status:'scheduled',goals:[]};if(m.homePlayers.some(pid=>m.awayPlayers.includes(pid)))fail('同一场比赛中，一位球员只能代表一支球队出场');if(old)s.matches[s.matches.indexOf(old)]=m;else s.matches.push(m);
+  const m:Match={id,kind,homeId,awayId,time,round:str(p.round,30,true),homePlayers:roster('homePlayers',homeId),awayPlayers:roster('awayPlayers',awayId),status:'scheduled',goals:[]};if(m.homePlayers.some(pid=>m.awayPlayers.includes(pid)))fail('同一场比赛中，一位球员只能代表一支球队出场');if(p.roles!==undefined){
+   const r=p.roles;if(!r||typeof r!=='object')fail('请登记双方前锋和后卫');const roles:MatchRoles={homeForwardId:str(r.homeForwardId,80,true),homeDefenderId:str(r.homeDefenderId,80,true),awayForwardId:str(r.awayForwardId,80,true),awayDefenderId:str(r.awayDefenderId,80,true)};
+   if(new Set(Object.values(roles)).size!==4)fail('双方前锋和后卫须为四位不同球员');
+   if(m.homePlayers.length!==2||m.awayPlayers.length!==2||![roles.homeForwardId,roles.homeDefenderId].every(pid=>m.homePlayers.includes(pid))||![roles.awayForwardId,roles.awayDefenderId].every(pid=>m.awayPlayers.includes(pid)))fail('前锋和后卫必须与本场两人阵容一致');
+   m.roles=roles;
+  }
+  if(p.startNow===true)m.status='live';
+  if(old)s.matches[s.matches.indexOf(old)]=m;else s.matches.push(m);
  }else if(a.type==='match.result'){
   const p=a.data;const old=s.matches.find(m=>m.id===id);
   const {kind,homeId,awayId}=matchIdentity(s,id,p,old);
@@ -99,7 +113,7 @@ export function applyAction(s:League,a:any):League{
   else if(a.type==='goal.add'){
    const p=a.data;const eventId=str(p.id,80,true);if(match.goals.some(g=>g.id===eventId))return s;
    if(match.status!=='live')fail('请先开始比赛，或重新打开已完赛比赛');const teamId=str(p.teamId,80,true);if(teamId!==match.homeId&&teamId!==match.awayId)fail('进球队伍不在本场比赛中');
-   const playerId=str(p.playerId,80),ownGoal=p.ownGoal===true;const roster=(teamId===match.homeId)!==ownGoal?match.homePlayers:match.awayPlayers;if(playerId&&!roster.includes(playerId))fail('请选择本场正确队伍的出场球员');if(ownGoal&&!playerId)fail('乌龙球请选择球员');
+   const playerId=str(p.playerId,80),ownGoal=p.ownGoal===true;const roster=(teamId===match.homeId)!==ownGoal?match.homePlayers:match.awayPlayers;if(playerId&&!roster.includes(playerId))fail('请选择本场正确队伍的出场球员');if(!playerId)fail('请选择进球球员');
    match.goals.push({id:eventId,teamId,playerId,ownGoal,minute:int(p.minute,0,999),createdAt:new Date().toISOString()});
   }else if(a.type==='goal.delete'){if(match.status!=='live')fail('请先重新打开比赛，再修改进球');match.goals=match.goals.filter(g=>g.id!==a.goalId)}
   else fail('未知操作');
