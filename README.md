@@ -4,8 +4,8 @@
 
 - [GitHub Pages](https://junjieyu28.github.io/g-super-league/)
 - 前端：React + Vite，GitHub Pages 托管。
-- 后端：你自己的 Cloudflare Worker + D1 数据库 + R2 头像桶。
-- **首次部署需要配置后端地址；仅发布 Pages 还不能登记或同步比分。** 未配置时页面会提示等待数据服务，不会生成假数据或把数据默默保存到单台浏览器。
+- 后端：你自己的 Cloudflare Worker + D1 数据库（含压缩头像）。
+- 当前已配置独立数据服务：https://g-super-league-api.jason-brown-20-28-2023.workers.dev 。新部署到其他账号时，需设置自己的后端地址。管理员密钥须由账号所有者在 Cloudflare 中设置。
 
 ## 功能与规则
 
@@ -25,7 +25,7 @@
 
 ### 1. 安装与准备
 
-需要 Node.js 22.13+、npm、Git，以及你自己的 Cloudflare 账号（启用 Workers、D1、R2）。
+需要 Node.js 22.13+、npm、Git，以及你自己的 Cloudflare 账号（启用 Workers、D1）。
 
 ```bash
 git clone https://github.com/JunjieYu28/g-super-league.git
@@ -34,10 +34,9 @@ npm ci
 npx wrangler login
 cp backend/wrangler.example.jsonc backend/wrangler.jsonc
 npx wrangler d1 create g-super-league
-npx wrangler r2 bucket create g-super-league-photos
 ```
 
-将创建 D1 时返回的 `database_id` 填入 `backend/wrangler.jsonc`，检查 `bucket_name` 与实际一致。该文件虽使用 `.jsonc` 扩展名，请保持标准 JSON（迁移脚本会读取它）。配置文件被 Git 忽略。
+将创建 D1 时返回的 `database_id` 填入 `backend/wrangler.jsonc`。该文件虽使用 `.jsonc` 扩展名，请保持标准 JSON（迁移脚本会读取它）。配置文件被 Git 忽略。
 
 `ALLOWED_ORIGINS` 使用网站**来源**而非含路径的网址，默认是 `https://junjieyu28.github.io,http://localhost:5173`。使用自定义域名时同步更新这里。
 
@@ -64,11 +63,11 @@ npm run restore
 
 导出内容放在 `.migration/backup.json` 和 `.migration/photos/`，含球队、球员、比赛、设置与头像原文件；这些个人数据不会进入公共仓库。`restore` 使用原头像 ID，且仅允许导入空联赛，拒绝覆盖已有记录。导入后核对人数、场次和榜单，再切换使用新网站。若旧站访问权限改变，需先恢复可读取的导出来源，或使用先前保存的完整备份。
 
-截至迁移准备时，旧站读取到 4 支球队、5 名球员、8 场比赛、0 张头像。数据尚未导入新服务，实际切换时应重新导出最新快照。
+2026-10-19 已将 4 支球队、5 名球员、8 场比赛导入独立 D1 数据库（当时没有头像）。后续迁移应重新导出最新快照。
 
 ### 4. 连接 GitHub Pages
 
-仓库 Settings → Secrets and variables → Actions → **Variables**，新增：
+本仓库工作流已配置当前后端的默认地址。更换后端时，可在仓库 Settings → Secrets and variables → Actions → **Variables** 新增覆盖值：
 
 | 名称 | 值 |
 |---|---|
@@ -79,6 +78,8 @@ Settings → Pages → Source 选择 **GitHub Actions**。Actions → Deploy Git
 网站路径默认 `/g-super-league/`。如果以后迁到用户根站或改仓库名，修改 `.github/workflows/pages.yml` 的 `VITE_BASE_PATH`。修改 Actions 变量后必须重新运行工作流，变量才会进入新的静态构建。
 
 没有管理密钥会返回 401；来源配置不匹配会返回 403；数据库未初始化时会返回 503。请勿把旧站地址用作新后端，它仍依赖原托管，并且没有新接口所需的跨域配置。
+
+头像默认存储在 D1 的 `photos` 表，客户端压缩到最长边 512 像素，上传限制 1MB。无需 R2 订阅。需要更大规模时，可在配置中加入绑定名为 `BUCKET` 的 R2 桶；接口和迁移脚本仍支持 R2。
 
 ## 本地开发
 
@@ -92,7 +93,7 @@ npm run api:dev
 npm run dev
 ```
 
-访问 `http://localhost:5173/g-super-league/`。本地 D1/R2 使用 Wrangler 本地存储，不改线上数据。
+访问 `http://localhost:5173/g-super-league/`。本地 D1 使用 Wrangler 本地存储，不改线上数据。
 
 ```bash
 npm test

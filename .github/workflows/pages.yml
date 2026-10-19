@@ -24,7 +24,7 @@ jobs:
       - run: npm run build
         env:
           VITE_BASE_PATH: /g-super-league/
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || 'https://g-super-league-api.jason-brown-20-28-2023.workers.dev' }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

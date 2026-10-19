@@ -1,5 +1,5 @@
 import {applyAction,emptyLeague} from '../../lib/league.ts';
-export interface Env { DB:D1Database; BUCKET:R2Bucket; ALLOWED_ORIGINS:string; ADMIN_TOKEN:string }
+export interface Env { DB:D1Database; BUCKET?:R2Bucket; ALLOWED_ORIGINS:string; ADMIN_TOKEN:string }
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 async function row(env:Env){
  await env.DB.prepare('INSERT OR IGNORE INTO league (id,data,revision) VALUES (?,?,0)').bind('main',JSON.stringify(emptyLeague())).run();
@@ -16,20 +16,29 @@ export async function handle(request:Request,env:Env):Promise<Response>{
  const url=new URL(request.url),path=url.pathname;
  if(request.method==='GET'&&path==='/api/league'){const r=await row(env);return json({data:JSON.parse(r.data),revision:r.revision})}
  if(request.method==='GET'&&/^\/api\/photos\/[a-f0-9-]+$/.test(path)){
-  const object=await env.BUCKET.get(path.replace('/api/',''));
-  if(!object)return json({error:'头像不存在'},404);
-  return new Response(object.body,{headers:{'Content-Type':object.httpMetadata?.contentType||'image/jpeg','Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'}});
+  if(env.BUCKET){
+   const object=await env.BUCKET.get(path.replace('/api/',''));
+   if(!object)return json({error:'头像不存在'},404);
+   return new Response(object.body,{headers:{'Content-Type':object.httpMetadata?.contentType||'image/jpeg','Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'}});
+  }
+  const photo=await env.DB.prepare('SELECT bytes,content_type FROM photos WHERE id=?').bind(path.split('/').at(-1)).first<{bytes:number[];content_type:string}>();
+  if(!photo)return json({error:'头像不存在'},404);
+  return new Response(new Uint8Array(photo.bytes),{headers:{'Content-Type':photo.content_type,'Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'}});
  }
  if(request.method!=='POST')return json({error:'接口不存在'},404);
  if(!await authorized(request,env))return json({error:'请使用有效的管理密钥登录'},401);
  if(path==='/api/auth')return json({ok:true});
  if(path==='/api/photos'){
-  if(Number(request.headers.get('Content-Length')||0)>2097152)return json({error:'头像不能超过 2MB'},413);
+  const maxPhoto=env.BUCKET?2097152:1048576;
+  if(Number(request.headers.get('Content-Length')||0)>maxPhoto)return json({error:'头像过大，请选择较小的图片'},413);
   const b=await request.arrayBuffer(),v=new Uint8Array(b);
-  if(b.byteLength>2097152)return json({error:'头像不能超过 2MB'},413);
+  if(b.byteLength>maxPhoto)return json({error:'头像过大，请选择较小的图片'},413);
   const type=v[0]===255&&v[1]===216&&v[2]===255?'image/jpeg':v[0]===137&&v[1]===80&&v[2]===78&&v[3]===71?'image/png':String.fromCharCode(...v.slice(0,4))==='RIFF'&&String.fromCharCode(...v.slice(8,12))==='WEBP'?'image/webp':null;
   if(!type)return json({error:'请上传 JPG、PNG 或 WebP 图片'},400);
-  const id=crypto.randomUUID();await env.BUCKET.put(`photos/${id}`,b,{httpMetadata:{contentType:type}});return json({url:`/api/photos/${id}`});
+  const id=crypto.randomUUID();
+  if(env.BUCKET)await env.BUCKET.put(`photos/${id}`,b,{httpMetadata:{contentType:type}});
+  else await env.DB.prepare('INSERT INTO photos (id,bytes,content_type) VALUES (?,?,?)').bind(id,b,type).run();
+  return json({url:`/api/photos/${id}`});
  }
  if(path==='/api/league'){
   const raw=await request.text();if(raw.length>20000)return json({error:'提交内容过大'},413);
