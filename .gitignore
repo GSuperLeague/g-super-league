@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.wrangler/
+.env*
+!.env.example
+.dev.vars*
+.migration/
+backend/wrangler.jsonc
+*.tsbuildinfo
+
+node_modules
