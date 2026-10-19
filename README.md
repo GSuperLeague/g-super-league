@@ -2,7 +2,7 @@
 
 桌面足球联赛管理网站，从原 Sites 项目迁移为独立 Git 仓库。
 
-- [GitHub Pages](https://junjieyu28.github.io/g-super-league/)
+- [GitHub Pages](https://gsuperleague.github.io/g-super-league/)
 - 前端：React + Vite，GitHub Pages 托管。
 - 后端：你自己的 Cloudflare Worker + D1 数据库（含压缩头像）。
 - 当前已配置独立数据服务：https://g-super-league-api.jason-brown-20-28-2023.workers.dev 。新部署到其他账号时，需设置自己的后端地址。管理员密钥须由账号所有者在 Cloudflare 中设置。
@@ -28,7 +28,7 @@
 需要 Node.js 22.13+、npm、Git，以及你自己的 Cloudflare 账号（启用 Workers、D1）。
 
 ```bash
-git clone https://github.com/JunjieYu28/g-super-league.git
+git clone https://github.com/GSuperLeague/g-super-league.git
 cd g-super-league
 npm ci
 npx wrangler login
@@ -38,7 +38,7 @@ npx wrangler d1 create g-super-league
 
 将创建 D1 时返回的 `database_id` 填入 `backend/wrangler.jsonc`。该文件虽使用 `.jsonc` 扩展名，请保持标准 JSON（迁移脚本会读取它）。配置文件被 Git 忽略。
 
-`ALLOWED_ORIGINS` 使用网站**来源**而非含路径的网址，默认是 `https://junjieyu28.github.io,http://localhost:5173`。使用自定义域名时同步更新这里。
+`ALLOWED_ORIGINS` 使用网站**来源**而非含路径的网址，默认是 `https://gsuperleague.github.io,https://junjieyu28.github.io,http://localhost:5173`。使用自定义域名时同步更新这里。
 
 ### 2. 发布数据服务
 
