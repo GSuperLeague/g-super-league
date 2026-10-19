@@ -1,3 +1,4 @@
+import { LiveMatchForm, OwnGoalsPage } from "./LiveMatch";
 import {
   EloLeaders,
   PlayerDirectory,
@@ -58,12 +59,14 @@ import {
   playerTeamIds,
   isTeamMember,
   matchTeam,
+  matchRoles,
 } from "@/lib/league";
 type Page =
   | "overview"
   | "matches"
   | "table"
   | "analytics"
+  | "ownGoals"
   | "players"
   | "teams"
   | "settings";
@@ -73,6 +76,7 @@ const nav = [
   { id: "matches", label: "赛程与比分", icon: CalendarDays },
   { id: "table", label: "球队积分榜", icon: Trophy },
   { id: "analytics", label: "赛场数据", icon: BarChart3 },
+  { id: "ownGoals", label: "乌龙球榜", icon: Undo2 },
   { id: "players", label: "球员档案", icon: Users },
   { id: "teams", label: "球队管理", icon: Shield },
 ];
@@ -135,10 +139,11 @@ function PickupLineup({
   const name = (id: string) =>
     players.find((p) => p.id === id)?.name || "已归档球员";
   const roster = side === "home" ? match.homePlayers : match.awayPlayers;
-  const roles = match.summary
+  const recordedRoles = matchRoles(match);
+  const roles = recordedRoles
     ? [
-        { label: "前锋", id: match.summary[`${side}ForwardId`] },
-        { label: "后卫", id: match.summary[`${side}DefenderId`] },
+        { label: "前锋", id: recordedRoles[`${side}ForwardId`] },
+        { label: "后卫", id: recordedRoles[`${side}DefenderId`] },
       ]
     : null;
   return (
@@ -1079,6 +1084,7 @@ export default function Home() {
                   </div>
                 </>
               )}
+              {page === "ownGoals" && <OwnGoalsPage league={s} onMatch={id=>{go("matches");setSelectedMatch(id)}} onPlayer={id=>{go("players");setSelectedPlayer(id)}} />}
               {page === "analytics" && (
                 <AnalyticsPage
                   league={s}
@@ -1269,14 +1275,14 @@ export default function Home() {
                   <div className="result-intro">
                     <span>
                       <CheckCircle2 size={17} />
-                      不用逐球登记：最终比分 + 双方前锋与后卫，一次完成结算。
+                      赛前登记阵容并实时记分，或赛后一次录入最终比分。
                     </span>
                     <button
                       className="btn secondary"
                       onClick={() => editMatch()}
                     >
                       <CalendarDays size={15} />
-                      创建赛程
+                      新建实时比赛
                     </button>
                   </div>
                   <div className="filterbar">
@@ -1402,13 +1408,13 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="scoreboard-actions">
-                      <button
+                      {(current.summary || current.status==='scheduled') && <button
                         className="btn lime"
                         onClick={() => editResult(current)}
                       >
                         <Pencil size={16} />
-                        {current.summary ? "编辑赛后结果" : "录入最终比分"}
-                      </button>
+                        {current.summary ? "编辑赛后结果" : "改用赛后录分"}
+                      </button>}
                       {!current.summary &&
                         (current.status === "scheduled" ? (
                           <>
@@ -1448,7 +1454,7 @@ export default function Home() {
                               }
                             >
                               <Plus size={17} />
-                              主队进球
+                              {team(current.homeId)?.name} +1
                             </button>
                             <button
                               className="btn lime"
@@ -1463,14 +1469,14 @@ export default function Home() {
                               }
                             >
                               <Plus size={17} />
-                              客队进球
+                              {team(current.awayId)?.name} +1
                             </button>
                             <button
                               className="btn ghost"
                               onClick={() =>
                                 confirm(
                                   "确认结束本场比赛？",
-                                  "完赛后结果立即计入球队积分榜。需要纠错时，可重新打开比赛。",
+                                  "保留每一粒进球及实际进球人，结算榜单、位置数据和 Elo。需要纠错时，可重新打开比赛。",
                                   { type: "match.finish", id: current.id },
                                 )
                               }
@@ -1657,9 +1663,9 @@ export default function Home() {
                                 <Avatar player={p} />
                                 <b>{p.name}</b>
                                 <span>
-                                  {current.summary
-                                    ? p.id === current.summary.homeForwardId ||
-                                      p.id === current.summary.awayForwardId
+                                  {matchRoles(current)
+                                    ? p.id === matchRoles(current)!.homeForwardId ||
+                                      p.id === matchRoles(current)!.awayForwardId
                                       ? "本场前锋"
                                       : "本场后卫"
                                     : p.position}
@@ -1787,8 +1793,7 @@ export default function Home() {
                             球员可加入多个球队，在球员卡片或档案页点击“编辑资料”修改。
                           </li>
                           <li>
-                            每队每场可登记 1–4
-                            位出场球员；同一场比赛中，每位球员只能代表一方。
+                            实时比赛先登记每队一名前锋、一名后卫；同一场比赛中，每位球员只能代表一方。
                           </li>
                           <li>
                             临时组队自由选择所有已登记球员，固定显示队伍A /
@@ -1796,7 +1801,7 @@ export default function Home() {
                             Elo，不影响常驻球队积分。
                           </li>
                           <li>
-                            赛后可直接填写最终比分，指定双方固定前锋和后卫，保存即完赛。
+                            赛后可直接填写最终比分，指定双方固定前锋和后卫，保存即完赛。实时比赛则逐球选择进球人，乌龙球给对方加分，另计乌龙球榜，记错可撤销。
                           </li>
                           <li>
                             得失分按球员在场时的球队比分统计，不等同于个人进球。前锋和后卫数据只使用本场明确记录的位置。
@@ -1915,18 +1920,19 @@ export default function Home() {
       )}
       {dialog?.kind === "match" && (
         <Modal
-          title={dialog.data ? "编辑比赛赛程" : "创建一场新比赛"}
+          title={dialog.data ? "编辑赛前阵容" : "新建实时比赛"}
           onClose={close}
           wide
         >
-          <MatchForm
+          <LiveMatchForm
             initial={dialog.data}
             teams={s.teams}
             players={s.players}
             busy={busy}
-            onSave={(data) =>
-              mutate({ type: "match.save", id: dialog.data?.id || uid(), data })
-            }
+            onSave={async (data) => {
+              const id=dialog.data?.id||data.matchId;
+              if(await mutate({type:"match.save",id,data})){setPage("matches");setSelectedMatch(id)}
+            }}
           />
         </Modal>
       )}
@@ -2433,181 +2439,6 @@ function MatchKindPicker({
     </div>
   );
 }
-function MatchForm({
-  initial,
-  teams,
-  players,
-  busy,
-  onSave,
-}: {
-  initial?: Match;
-  teams: Team[];
-  players: Player[];
-  busy: boolean;
-  onSave: (d: any) => void;
-}) {
-  const [kind, setKind] = useState<"regular" | "pickup">(
-    initial?.kind || (teams.length >= 2 ? "regular" : "pickup"),
-  );
-  const [home, setHome] = useState(initial?.homeId || teams[0]?.id || ""),
-    [away, setAway] = useState(initial?.awayId || teams[1]?.id || ""),
-    [homePlayers, setHomePlayers] = useState<string[]>(
-      initial?.homePlayers || [],
-    ),
-    [awayPlayers, setAwayPlayers] = useState<string[]>(
-      initial?.awayPlayers || [],
-    );
-  return (
-    <form
-      className="entity-form"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const f = new FormData(e.currentTarget);
-        onSave({
-          kind,
-          homeId: home,
-          awayId: away,
-          homePlayers,
-          awayPlayers,
-          time: new Date(`${f.get("time")}:00+08:00`).toISOString(),
-          round: f.get("round"),
-        });
-      }}
-    >
-      <MatchKindPicker
-        kind={kind}
-        locked={!!initial}
-        onChange={(k) => {
-          setKind(k);
-          setHomePlayers([]);
-          setAwayPlayers([]);
-        }}
-      />
-      <div className="form-grid">
-        <label>
-          轮次 / 比赛名称 <em>*</em>
-          <input
-            name="round"
-            defaultValue={initial?.round || "友谊对决"}
-            maxLength={30}
-            required
-          />
-        </label>
-        <label>
-          比赛时间（北京时间） <em>*</em>
-          <input
-            type="datetime-local"
-            name="time"
-            defaultValue={dateInput(initial?.time)}
-            required
-          />
-        </label>
-      </div>
-      <div className="form-grid roster-select">
-        {[
-          {
-            label: kind === "pickup" ? "队伍A" : "主队",
-            value: home,
-            set: setHome,
-            other: away,
-            selected: homePlayers,
-            setSelected: setHomePlayers,
-            opposite: awayPlayers,
-          },
-          {
-            label: kind === "pickup" ? "队伍B" : "客队",
-            value: away,
-            set: setAway,
-            other: home,
-            selected: awayPlayers,
-            setSelected: setAwayPlayers,
-            opposite: homePlayers,
-          },
-        ].map((x) => (
-          <div key={x.label}>
-            {kind === "pickup" ? (
-              <div className="pickup-team-name">
-                {x.label}
-                <span>本场临时阵容</span>
-              </div>
-            ) : (
-              <label>
-                {x.label} <em>*</em>
-                <select
-                  value={x.value}
-                  onChange={(e) => {
-                    x.set(e.target.value);
-                    x.setSelected([]);
-                  }}
-                  required
-                >
-                  <option value="">选择常驻球队</option>
-                  {teams.map((t) => (
-                    <option key={t.id} value={t.id} disabled={t.id === x.other}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <p className="help-text">选择出场球员（1–4 人）</p>
-            <div className="roster-options">
-              {players
-                .filter((p) => kind === "pickup" || isTeamMember(p, x.value))
-                .map((p) => (
-                  <label className="check-player" key={p.id}>
-                    <input
-                      type="checkbox"
-                      disabled={x.opposite.includes(p.id)}
-                      checked={x.selected.includes(p.id)}
-                      onChange={(e) =>
-                        x.setSelected(
-                          e.target.checked
-                            ? [...x.selected, p.id]
-                            : x.selected.filter((id) => id !== p.id),
-                        )
-                      }
-                    />
-                    <Avatar player={p} />
-                    <span>
-                      {p.name}
-                      {x.opposite.includes(p.id) && (
-                        <small className="opponent-note">已代表对方出场</small>
-                      )}
-                    </span>
-                    <small>#{p.number}</small>
-                  </label>
-                ))}
-              {!players.some(
-                (p) => kind === "pickup" || isTeamMember(p, x.value),
-              ) && <p className="help-text">暂无可选球员，请先登记球员。</p>}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="form-footer">
-        <span className="help-text">
-          同一场比赛，每位球员只能代表一方出场。
-        </span>
-        <button
-          className="btn primary"
-          disabled={
-            busy ||
-            (kind === "regular" && (!home || !away || home === away)) ||
-            homePlayers.length < 1 ||
-            awayPlayers.length < 1 ||
-            homePlayers.length > 4 ||
-            awayPlayers.length > 4 ||
-            homePlayers.some((id) => awayPlayers.includes(id))
-          }
-        >
-          {busy ? "保存中…" : initial ? "保存赛程" : "创建比赛"}
-          <ArrowRight size={16} />
-        </button>
-      </div>
-    </form>
-  );
-}
 function GoalForm({
   match,
   teamId,
@@ -2667,10 +2498,10 @@ function GoalForm({
         <select
           value={playerId}
           onChange={(e) => setPlayerId(e.target.value)}
-          required={ownGoal}
+          required
         >
           <option value="">
-            {ownGoal ? "请选择对方球员" : "暂不指定球员"}
+            {ownGoal ? "请选择对方球员" : "请选择本方进球球员"}
           </option>
           {players
             .filter((p) => ids.includes(p.id))
@@ -2693,11 +2524,11 @@ function GoalForm({
         />
       </label>
       <p className="help-text">
-        未指定球员时只计入球队比分。乌龙球独立保存。记错后可在时间线撤销并重新登记。
+        选择实际进球人；乌龙球选择对方球员，给本队加分并更新乌龙球榜。记错可在时间线撤销并重新登记。
       </p>
       <div className="form-footer">
         <span>比分与比赛统计将同步更新</span>
-        <button className="btn primary" disabled={busy}>
+        <button className="btn primary" disabled={busy || !playerId}>
           {busy ? "正在记分…" : "确认进球"}
           <Goal size={16} />
         </button>
@@ -2753,16 +2584,16 @@ function ResultForm({
     return [f?.id || "", d?.id || ""];
   };
   const [homeForwardId, setHF] = useState(
-      initial?.summary?.homeForwardId || defaults(home, "home")[0],
+      (initial ? matchRoles(initial)?.homeForwardId : undefined) || defaults(home, "home")[0],
     ),
     [homeDefenderId, setHD] = useState(
-      initial?.summary?.homeDefenderId || defaults(home, "home")[1],
+      (initial ? matchRoles(initial)?.homeDefenderId : undefined) || defaults(home, "home")[1],
     ),
     [awayForwardId, setAF] = useState(
-      initial?.summary?.awayForwardId || defaults(away, "away")[0],
+      (initial ? matchRoles(initial)?.awayForwardId : undefined) || defaults(away, "away")[0],
     ),
     [awayDefenderId, setAD] = useState(
-      initial?.summary?.awayDefenderId || defaults(away, "away")[1],
+      (initial ? matchRoles(initial)?.awayDefenderId : undefined) || defaults(away, "away")[1],
     );
   const [homeScore, setHS] = useState(initial ? String(score(initial)[0]) : ""),
     [awayScore, setAS] = useState(initial ? String(score(initial)[1]) : ""),
