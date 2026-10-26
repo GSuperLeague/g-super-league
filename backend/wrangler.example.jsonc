@@ -12,6 +12,12 @@
       "database_name": "g-super-league",
       "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
       "migrations_dir": "migrations"
+    },
+    {
+      "binding": "DB_SINGLES",
+      "database_name": "g-super-league-singles",
+      "database_id": "REPLACE_WITH_A_DIFFERENT_SINGLES_DATABASE_ID",
+      "migrations_dir": "migrations"
     }
   ]
 }

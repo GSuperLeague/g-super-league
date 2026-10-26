@@ -372,7 +372,7 @@ function Empty({
     </div>
   );
 }
-function Modal({
+export function Modal({
   title,
   children,
   onClose,
@@ -447,7 +447,7 @@ function Modal({
     </div>
   );
 }
-export default function Home() {
+export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
   const [s, setS] = useState<League>(emptyLeague),
     [loaded, setLoaded] = useState(false),
     [online, setOnline] = useState(true),
@@ -738,6 +738,7 @@ export default function Home() {
             <small>TABLE FOOTBALL LEAGUE</small>
           </span>
         </button>
+        {modeSwitch}
         <div className="side-label">
           赛事中心 <span>LEAGUE CENTER</span>
         </div>
@@ -783,7 +784,7 @@ export default function Home() {
       <div className="main-shell">
         <header className="topbar">
           <div className="breadcrumb">
-            赛事中心 <ChevronRight size={13} />
+            双打赛事 <ChevronRight size={13} />
             <span>{nav.find((n) => n.id === page)?.label || "联赛设置"}</span>
           </div>
           <div className="top-actions">

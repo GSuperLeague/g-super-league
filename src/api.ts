@@ -19,3 +19,27 @@ export async function loginAdmin(token:string){
  if(!r.ok)throw new Error('管理密钥不正确或数据服务不可用');
  sessionStorage.setItem(tokenKey,token);
 }
+
+const singlesTokenKey = 'g-super-league:singles-admin-token';
+export const singlesToken = () => sessionStorage.getItem(singlesTokenKey) || '';
+export const clearSinglesAdmin = () => sessionStorage.removeItem(singlesTokenKey);
+export const singlesPhotoUrl = (path: string) => /^\/api\/singles\/photos\/[a-f0-9-]+$/.test(path) ? `${apiBase}${path}` : '';
+export async function singlesRequest<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
+  if (!apiConfigured) throw new Error('网站尚未连接数据服务');
+  const headers = new Headers(init.headers);
+  if (init.method && init.method !== 'GET' && !headers.has('Authorization')) {
+    const token = singlesToken();
+    if (!token) throw new Error('请先登录单打管理');
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  const response = await fetch(`${apiBase}/api/singles${path}`, { ...init, headers, mode: 'cors', credentials: 'omit' });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(body?.error || (response.status === 404 ? '单打服务尚未部署' : '单打服务暂时不可用'));
+  }
+  return response.json() as Promise<T>;
+}
+export async function loginSinglesAdmin(token: string) {
+  await singlesRequest('/auth', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+  sessionStorage.setItem(singlesTokenKey, token);
+}

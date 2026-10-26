@@ -1,9 +1,12 @@
 import {applyAction,emptyLeague} from '../../lib/league.ts';
-export interface Env { DB:D1Database; BUCKET?:R2Bucket; ALLOWED_ORIGINS:string; ADMIN_TOKEN:string }
+import {applySinglesAction,emptySinglesLeague} from '../../lib/singles.ts';
+export interface Env { DB:D1Database; DB_SINGLES?:D1Database; BUCKET?:R2Bucket; ALLOWED_ORIGINS:string; ADMIN_TOKEN:string; SINGLES_ADMIN_TOKEN?:string }
 const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
-async function row(env:Env){
- await env.DB.prepare('INSERT OR IGNORE INTO league (id,data,revision) VALUES (?,?,0)').bind('main',JSON.stringify(emptyLeague())).run();
- return (await env.DB.prepare('SELECT data,revision FROM league WHERE id=?').bind('main').first<{data:string;revision:number}>())!;
+async function row(env:Env,singles=false){
+ await env.DB.prepare('INSERT OR IGNORE INTO league (id,data,revision) VALUES (?,?,0)').bind('main',JSON.stringify(singles?emptySinglesLeague():emptyLeague())).run();
+ const result=(await env.DB.prepare('SELECT data,revision FROM league WHERE id=?').bind('main').first<{data:string;revision:number}>())!;
+ if((JSON.parse(result.data).mode==='singles')!==singles)throw new Error('Database mode mismatch');
+ return result;
 }
 async function authorized(request:Request,env:Env){
  if(!env.ADMIN_TOKEN||env.ADMIN_TOKEN.length<24)return false;
@@ -13,8 +16,16 @@ async function authorized(request:Request,env:Env){
  let diff=0;for(let i=0;i<a.length;i++)diff|=a[i]^b[i];return diff===0;
 }
 export async function handle(request:Request,env:Env):Promise<Response>{
- const url=new URL(request.url),path=url.pathname;
- if(request.method==='GET'&&path==='/api/league'){const r=await row(env);return json({data:JSON.parse(r.data),revision:r.revision})}
+ const url=new URL(request.url),singles=url.pathname.startsWith('/api/singles/');
+ const path=singles?url.pathname.replace('/api/singles/','/api/'):url.pathname;
+ if(singles){
+  // Never fall back to the doubles database or avatar bucket.
+  if(!env.DB_SINGLES||env.DB_SINGLES===env.DB)return json({error:'单打数据库尚未配置',code:'SINGLES_UNAVAILABLE'},503);
+  env={...env,DB:env.DB_SINGLES,BUCKET:undefined,ADMIN_TOKEN:env.SINGLES_ADMIN_TOKEN??env.ADMIN_TOKEN};
+  // A misconfigured binding must not expose doubles records or avatars.
+  await row(env,true);
+ }
+ if(request.method==='GET'&&path==='/api/league'){const r=await row(env,singles);return json({data:JSON.parse(r.data),revision:r.revision})}
  if(request.method==='GET'&&/^\/api\/photos\/[a-f0-9-]+$/.test(path)){
   if(env.BUCKET){
    const object=await env.BUCKET.get(path.replace('/api/',''));
@@ -38,14 +49,14 @@ export async function handle(request:Request,env:Env):Promise<Response>{
   const id=crypto.randomUUID();
   if(env.BUCKET)await env.BUCKET.put(`photos/${id}`,b,{httpMetadata:{contentType:type}});
   else await env.DB.prepare('INSERT INTO photos (id,bytes,content_type) VALUES (?,?,?)').bind(id,b,type).run();
-  return json({url:`/api/photos/${id}`});
+  return json({url:`/api/${singles?'singles/':''}photos/${id}`});
  }
  if(path==='/api/league'){
   const raw=await request.text();if(raw.length>20000)return json({error:'提交内容过大'},413);
   let action;try{action=JSON.parse(raw)}catch{return json({error:'无效 JSON'},400)}
   for(let i=0;i<5;i++){
-   const r=await row(env);let data;
-   try{data=applyAction(JSON.parse(r.data),action)}catch(e){return json({error:e instanceof Error?e.message:'提交信息有误'},400)}
+   const r=await row(env,singles);let data;
+   try{data=singles?applySinglesAction(JSON.parse(r.data),action):applyAction(JSON.parse(r.data),action)}catch(e){return json({error:e instanceof Error?e.message:'提交信息有误'},400)}
    const encoded=JSON.stringify(data);if(encoded.length>1800000)return json({error:'记录容量已满，请导出备份'},400);
    const result=await env.DB.prepare('UPDATE league SET data=?,revision=revision+1 WHERE id=? AND revision=?').bind(encoded,'main',r.revision).run();
    if(result.meta.changes===1)return json({data,revision:r.revision+1});

@@ -2,12 +2,14 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { spawn, spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { emptyLeague } from "../lib/league.ts";
 
 const snapshotPath = process.argv[2];
-if (!snapshotPath)
-  throw new Error("用法: npm run dev:snapshot -- <导出的 JSON 文件>");
-const snapshot = JSON.parse(await readFile(snapshotPath, "utf8"));
+const snapshot = snapshotPath
+  ? JSON.parse(await readFile(snapshotPath, "utf8"))
+  : { league: emptyLeague() };
 const league = snapshot.league ?? snapshot.data;
+const singles = league?.mode === "singles";
 if (
   !league ||
   !["teams", "players", "matches"].every((key) => Array.isArray(league[key])) ||
@@ -53,6 +55,12 @@ await writeFile(
           database_id: "00000000-0000-0000-0000-000000000000",
           migrations_dir: resolve("backend/migrations"),
         },
+        {
+          binding: "DB_SINGLES",
+          database_name: "g-super-league-singles-local-preview",
+          database_id: "00000000-0000-0000-0000-000000000001",
+          migrations_dir: resolve("backend/migrations"),
+        },
       ],
     },
     null,
@@ -71,13 +79,22 @@ const run = (args) => {
   if (result.status !== 0) throw new Error("本地数据库初始化失败");
 };
 run(["d1", "migrations", "apply", "DB", ...localArgs]);
+run(["d1", "migrations", "apply", "DB_SINGLES", ...localArgs]);
 const encoded = JSON.stringify(league).replaceAll("'", "''");
 const sql = resolve(dir, "snapshot.sql");
 await writeFile(
   sql,
   `INSERT INTO league (id,data,revision) VALUES ('main','${encoded}',0) ON CONFLICT(id) DO UPDATE SET data=excluded.data, revision=league.revision+1;`,
 );
-run(["d1", "execute", "DB", "--file", sql, ...localArgs]);
+if (snapshotPath)
+  run([
+    "d1",
+    "execute",
+    singles ? "DB_SINGLES" : "DB",
+    "--file",
+    sql,
+    ...localArgs,
+  ]);
 const children = [];
 let closing = false;
 const stop = () => {
@@ -157,7 +174,9 @@ if (!closing) {
     },
   );
   console.log(
-    `\n本地快照: ${league.teams.length} 支球队 / ${league.players.length} 名球员 / ${league.matches.length} 场比赛`,
+    snapshotPath
+      ? `\n${singles ? "单打" : "双打"}本地快照: ${league.players.length} 名球员 / ${league.matches.length} 场比赛`
+      : "\n本地预览: 单打与双打使用两个独立数据库",
   );
   console.log(`预览: http://localhost:${frontPort}/g-super-league/`);
   if (process.env.VC_PREFIX) {

@@ -1,6 +1,6 @@
 # G超联赛
 
-桌面足球联赛管理网站，从原 Sites 项目迁移为独立 Git 仓库。
+桌面足球联赛管理网站，从原 Sites 项目迁移为独立 Git 仓库。支持单打、双打两个独立板块。
 
 - [GitHub Pages](https://gsuperleague.github.io/g-super-league/)
 - 前端：React + Vite，GitHub Pages 托管。
@@ -8,6 +8,10 @@
 - 当前已配置独立数据服务：https://g-super-league-api.jason-brown-20-28-2023.workers.dev 。新部署到其他账号时，需设置自己的后端地址。管理员密钥须由账号所有者在 Cloudflare 中设置。
 
 ## 功能与规则
+
+左上角切换单打 / 双打。单打球员独立登记，不要求加入球队；球员资料、头像、比赛、积分、Elo、历史交手及赛季设置均独立保存。双打保留原有球队、位置和搭档规则。
+
+单打支持赛程、实时逐球记分、乌龙球、撤销、完赛与重新打开，以及赛后直接录入最终比分。只有已完赛比赛计入个人积分与 Elo，初始 Elo 1200、K=32，按时间顺序回算；比分差不影响 Elo。修改或删除历史比赛会重新计算后续评分。月份筛选内的 Elo 从 1200 重算；比赛详情始终展示完整历史下的当场变化。乌龙球只统计明确事件，不从汇总比分推算。
 
 球队登记、球员编辑、多球队成员关系、球员画像、虚拟身价、赛程、赛前阵容登记、实时逐球记分、乌龙球榜与事件明细、赛后直接登记最终比分、球队积分榜、射手与防守榜、个人与分位置表现、双人搭档、同阵容换位对照、历史交手、三套 Elo、单场 Elo 变化、三种数据雷达、赛场荣誉、JSON 导出、每 3 秒同步。
 
@@ -75,6 +79,43 @@ npm run restore
 
 2026-10-19 已将 4 支球队、5 名球员、8 场比赛导入独立 D1 数据库（当时没有头像）。后续迁移应重新导出最新快照。
 
+### 单打数据库与现有部署升级
+
+单打必须新建独立的 **D1 数据库**，不能复用双打的 `database_id`。两库沿用相同的 `league` / `photos` 表结构；各自保存 `id=main` 的联赛 JSON 和独立 `revision`，单打 JSON 额外带有 `mode: "singles"`。单打 API 为 `/api/singles/league`、`/api/singles/photos` 和 `/api/singles/auth`，双打原有 API 不变。
+
+已有线上双打部署时，在原 Cloudflare 账号中执行：
+
+```bash
+npx wrangler login
+npx wrangler d1 create g-super-league-singles
+```
+
+保留 `backend/wrangler.jsonc` 中原有 `DB` 的配置，按 `backend/wrangler.example.jsonc` 增加 `DB_SINGLES`，填入新库 ID，并将 `migrations_dir` 设为 `migrations`。随后执行：
+
+```bash
+npm run db:singles:remote
+npm run api:deploy
+```
+
+全新部署还需先创建并初始化双打 `DB`。`api:deploy` 会校验两个真实数据库 ID 不同。单打未配置时接口返回 503，不回退到双打库；单打头像始终使用自己的 D1，即使双打启用了 R2。
+
+默认两种模式使用同一个 Worker 管理密钥，但浏览器登录状态分别保存。需要独立单打密钥时执行：
+
+```bash
+npx wrangler secret put SINGLES_ADMIN_TOKEN --config backend/wrangler.jsonc
+```
+
+GitHub Pages 工作流只发布前端，**不会自动创建 D1 或部署 Worker**。应先完成以上后端升级，再发布前端。GitHub 仓库写权限与 Cloudflare 权限独立。
+
+单打完整备份（含头像）与空库恢复使用独立目录 `.migration/singles/`：
+
+```bash
+LEAGUE_MODE=singles SOURCE_URL=https://你的后端地址 npm run backup
+LEAGUE_MODE=singles npm run restore
+```
+
+不设置 `LEAGUE_MODE` 时继续使用原有双打备份流程；恢复时拒绝单打、双打备份混用。页面导出只包含当前板块 JSON 和头像链接，不含图片文件。
+
 ### 4. 连接 GitHub Pages
 
 本仓库工作流已配置当前后端的默认地址。更换后端时，可在仓库 Settings → Secrets and variables → Actions → **Variables** 新增覆盖值：
@@ -93,6 +134,24 @@ Settings → Pages → Source 选择 **GitHub Actions**。Actions → Deploy Git
 
 ## 本地开发
 
+### 空库预览与单打浏览器测试
+
+```bash
+npm ci
+npm run dev:snapshot
+```
+
+不传快照时启动本地 Worker 和 Vite，自动初始化两个独立的本地数据库，保留已有本地记录。访问终端输出的 URL；本地管理密钥为 `preview-only-admin-token-2026`，两种模式分别登录。此模式不需要 Cloudflare 登录，也不会写入线上数据库。
+
+服务器运行后，另开终端执行：
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+浏览器测试仅允许本地地址，覆盖球员登记和头像、记分/乌龙球/撤销、完赛与改分、Elo、交手记录、数据导出、单打/双打隔离及桌面/390px/320px 布局。测试会清理自己创建的球员和比赛；截图保存在忽略目录 `.migration/browser-checks/`。端口非 5173 时设置 `GSL_LOCAL_FRONT_PORT`，或使用 `E2E_BASE_URL` 指定完整本地前端地址。
+
 ### 后端无法连接时：导出数据、本地预览
 
 在能访问线上数据的浏览器中，进入「联赛设置 → 导出数据快照」，将 JSON 放到仓库根目录。开发机无需连接线上后端，直接启动本地 demo（Node.js 22.13+）：
@@ -110,7 +169,7 @@ Notebook 端口代理只负责打开开发服务器，不等于访问线上接�
 
 本地管理密钥为 `preview-only-admin-token-2026`，仅用于本地 Worker。可登录后测试录入、编辑、删除；所有更改保存在 `.migration/local-preview/`，再次运行命令时会恢复到传入的快照。JSON 中的头像是链接，不含原图。
 
-该模式只运行本地服务，快照与本地数据库不打包进前端，也不写入线上数据。导出的 `G超联赛-*.json` 已加入 Git 忽略规则。
+该模式只运行本地服务，快照与本地数据库不打包进前端，也不写入线上数据。导出的 `G超联赛-*.json` 已加入 Git 忽略规则。单打快照根据 `mode: "singles"` 导入单打本地库；其他快照导入双打本地库，不覆盖另一板块。
 
 预览确认后运行 `npm test`、`npm run build`，再提交并 `git push origin main`；GitHub Actions 发布前端代码，线上联赛数据保持独立。
 
@@ -120,6 +179,7 @@ Notebook 端口代理只负责打开开发服务器，不等于访问线上接�
 cp .env.example .env.local
 cp backend/wrangler.example.jsonc backend/wrangler.jsonc
 npm run db:local
+npm run db:singles:local
 # 在 backend/.dev.vars 写入仅供本地使用的 ADMIN_TOKEN，至少 24 字符
 npm run api:dev
 # 另开终端
@@ -138,6 +198,9 @@ npm run build
 | 路径 | 用途 |
 |---|---|
 | `src/App.tsx`、`src/styles.css` | 页面与交互 |
+| `src/LeagueApp.tsx` | 单打 / 双打入口与模式导航 |
+| `src/Singles.tsx`、`src/singles.css` | 独立单打页面、球员资料、比赛及统计 |
+| `lib/singles.ts` | 单打校验、记分、个人积分与 Elo 回算 |
 | `src/api.ts` | 独立接口地址、头像地址、管理员会话 |
 | `lib/league.ts` | 共用业务校验、比分及榜单计算 |
 | `lib/analytics.ts` | 赛果统计、Elo、搭档、交手和雷达指标 |

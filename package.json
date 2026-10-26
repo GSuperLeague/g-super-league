@@ -8,14 +8,17 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "dev:snapshot": "node scripts/dev-snapshot.mjs",
+    "dev:snapshot": "node --experimental-strip-types scripts/dev-snapshot.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:e2e": "node tests/singles.e2e.mjs",
     "api:dev": "wrangler dev --config backend/wrangler.jsonc",
-    "api:deploy": "wrangler deploy --config backend/wrangler.jsonc",
+    "api:deploy": "node scripts/check-db-config.mjs && wrangler deploy --config backend/wrangler.jsonc",
     "db:local": "wrangler d1 migrations apply DB --local --config backend/wrangler.jsonc",
     "db:remote": "wrangler d1 migrations apply DB --remote --config backend/wrangler.jsonc",
+    "db:singles:local": "wrangler d1 migrations apply DB_SINGLES --local --config backend/wrangler.jsonc",
+    "db:singles:remote": "wrangler d1 migrations apply DB_SINGLES --remote --config backend/wrangler.jsonc",
     "backup": "node scripts/migrate.mjs export",
     "restore": "node scripts/migrate.mjs import"
   },
@@ -30,6 +33,7 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
     "@cloudflare/workers-types": "4.20260515.1",
+    "playwright": "1.64.0",
     "typescript": "5.9.3",
     "vite": "8.0.13",
     "wrangler": "4.92.0"
