@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import {
   analyzeLeague,
-  ELO_BASE,
   MIN_SAMPLE,
   radarAxes,
   relationships,
@@ -48,6 +47,8 @@ import {
 } from "../lib/league.ts";
 import type { League, Match, Player } from "../lib/league.ts";
 import { photoUrl } from "./api";
+import { RATING_BASE } from "../lib/rating.ts";
+import { RankLegend, RankScore } from "./RankScore";
 
 const num = (n: number | null, digits = 2) =>
   n === null ? "—" : n.toFixed(digits);
@@ -62,7 +63,7 @@ const roleLabels: Record<Role, string> = {
 };
 const resultLabels = { W: "胜", D: "平", L: "负" };
 const byRating = (a: PlayerStats, b: PlayerStats) =>
-  b.elo.overall - a.elo.overall ||
+  b.rankPoints.overall - a.rankPoints.overall ||
   b.overall.games - a.overall.games ||
   a.player.id.localeCompare(b.player.id);
 const teamsFor = (s: League, p: Player) =>
@@ -146,7 +147,7 @@ function MetricsStrip({
   );
 }
 
-export function EloLeaders({
+export function RankLeaders({
   league,
   onPlayer,
   onAnalytics,
@@ -165,7 +166,7 @@ export function EloLeaders({
       <div className="data-section-heading">
         <h2>
           <TrendingUp size={18} />
-          Elo 实力榜
+          个人段位榜
         </h2>
         <button className="text-btn" onClick={onAnalytics}>
           全部数据
@@ -182,16 +183,16 @@ export function EloLeaders({
             <span className="leader-place">0{i + 1}</span>
             <Person player={p.player} />
             <div className="leader-rating">
-              <strong>{Math.round(p.elo.overall)}</strong>
-              <small>总 Elo · {p.overall.games} 场</small>
+              <strong>
+                <RankScore points={p.rankPoints.overall} />
+              </strong>
+              <small>{p.overall.games} 场 · 总段位分</small>
             </div>
             <ArrowUpRight size={16} />
           </button>
         ))}
       </div>
-      {!leaders.length && (
-        <DataEmpty text="完赛并记录双方位置后生成 Elo 排名" />
-      )}
+      {!leaders.length && <DataEmpty text="完赛并记录双方位置后生成段位排名" />}
     </section>
   );
 }
@@ -275,10 +276,10 @@ export function PlayerDirectory({
               <div className="directory-metrics">
                 <div>
                   <strong>
-                    {p.ratedGames[role] ? Math.round(p.elo[role]) : "—"}
+                    <RankScore points={p.rankPoints[role]} />
                   </strong>
                   <small>
-                    {role === "overall" ? "总" : roleLabels[role]} Elo
+                    {role === "overall" ? "总" : roleLabels[role]}段位分
                   </small>
                 </div>
                 <div>
@@ -477,9 +478,9 @@ export function PlayerProfile({
       <MetricsStrip
         items={[
           {
-            label: `${role === "overall" ? "总" : roleLabels[role]} Elo`,
-            value: stats.ratedGames[role] ? Math.round(stats.elo[role]) : "—",
-            sub: `${stats.ratedGames[role]} 场有效定级`,
+            label: `${role === "overall" ? "总" : roleLabels[role]}段位分`,
+            value: <RankScore points={stats.rankPoints[role]} showTier />,
+            sub: `${stats.ratedGames[role]} 场有效计分`,
             tone: "blue",
           },
           {
@@ -566,7 +567,7 @@ export function PlayerProfile({
                 <th>场均得分</th>
                 <th>场均失分</th>
                 <th>场均净胜</th>
-                <th>Elo</th>
+                <th>段位分</th>
               </tr>
             </thead>
             <tbody>
@@ -582,7 +583,7 @@ export function PlayerProfile({
                   <td>{num(stats[r].avgAgainst)}</td>
                   <td>{signed(stats[r].avgDifference)}</td>
                   <td>
-                    {stats.ratedGames[r] ? Math.round(stats.elo[r]) : "—"}
+                    <RankScore points={stats.rankPoints[r]} />
                   </td>
                 </tr>
               ))}
@@ -606,10 +607,10 @@ export function PlayerProfile({
       </div>
       <section className="data-section">
         <div className="data-section-heading">
-          <h2>Elo 轨迹</h2>
+          <h2>段位分轨迹</h2>
           <span className="data-caption">按比赛时间 · {roleLabels[role]}</span>
         </div>
-        <EloChart stats={stats} role={role} />
+        <RankChart stats={stats} role={role} />
       </section>
       <section className="data-section">
         <div className="data-section-heading">
@@ -644,16 +645,16 @@ export function PlayerProfile({
   );
 }
 
-function EloChart({ stats, role }: { stats: PlayerStats; role: Role }) {
+function RankChart({ stats, role }: { stats: PlayerStats; role: Role }) {
   const values = stats.history
     .filter((r) =>
       role === "overall"
-        ? r.elo !== undefined
-        : r.role === role && r.roleElo !== undefined,
+        ? r.rankPoints !== undefined
+        : r.role === role && r.roleRankPoints !== undefined,
     )
-    .map((r) => (role === "overall" ? r.elo! : r.roleElo!));
-  if (!values.length) return <DataEmpty text="暂无有效定级比赛" />;
-  const series = [ELO_BASE, ...values];
+    .map((r) => (role === "overall" ? r.rankPoints! : r.roleRankPoints!));
+  if (!values.length) return <DataEmpty text="暂无有效计分比赛" />;
+  const series = [RATING_BASE, ...values];
   const min = Math.min(...series) - 15,
     max = Math.max(...series) + 15;
   const x = (i: number) => 44 + (i / (series.length - 1)) * 580;
@@ -663,18 +664,18 @@ function EloChart({ stats, role }: { stats: PlayerStats; role: Role }) {
       <svg
         viewBox="0 0 660 190"
         role="img"
-        aria-label={`Elo 从 ${ELO_BASE} 变化至 ${Math.round(values.at(-1)!)}，共 ${values.length} 场`}
+        aria-label={`段位分从 ${RATING_BASE} 变化至 ${Math.round(values.at(-1)!)}，共 ${values.length} 场`}
       >
         <line
           x1="44"
           x2="624"
-          y1={y(ELO_BASE)}
-          y2={y(ELO_BASE)}
+          y1={y(RATING_BASE)}
+          y2={y(RATING_BASE)}
           stroke="#d7dddf"
           strokeDasharray="4 4"
         />
-        <text x="3" y={y(ELO_BASE) + 4}>
-          {ELO_BASE}
+        <text x="3" y={y(RATING_BASE) + 4}>
+          {RATING_BASE}
         </text>
         <path
           d={series.map((v, i) => `${i ? "L" : "M"}${x(i)},${y(v)}`).join(" ")}
@@ -776,7 +777,7 @@ export function AnalyticsPage({
   const [role, setRole] = useState<Role>("overall");
   const [query, setQuery] = useState("");
   const [minimum, setMinimum] = useState(1);
-  const [sort, setSort] = useState("elo");
+  const [sort, setSort] = useState("rank");
   const [scope, setScope] = useState("all");
   const [month, setMonth] = useState("");
   const [pairMode, setPairMode] = useState("overall");
@@ -803,7 +804,7 @@ export function AnalyticsPage({
           <span className="eyebrow">G SUPER LEAGUE / ANALYTICS</span>
           <h1>赛场数据</h1>
           <p>
-            {data.finished.length} 场完赛 · {data.ratedMatches} 场有效定级
+            {data.finished.length} 场完赛 · {data.ratedMatches} 场有效计分
           </p>
         </div>
         <span className="data-status">
@@ -898,7 +899,7 @@ export function AnalyticsPage({
                 value={sort}
                 onChange={(e) => setSort(e.target.value)}
               >
-                <option value="elo">Elo 从高到低</option>
+                <option value="rank">段位分从高到低</option>
                 <option value="winRate">胜率从高到低</option>
                 <option value="avgDifference">场均净胜从高到低</option>
                 <option value="avgFor">场均得分从高到低</option>
@@ -1128,7 +1129,7 @@ function ScoringRankings({
   );
 }
 
-export function MatchElo({
+export function MatchRank({
   league,
   match,
   onPlayer,
@@ -1140,24 +1141,24 @@ export function MatchElo({
   const result = useMemo(() => matchRatings(league, match), [league, match]);
   const [mode, setMode] = useState<"overall" | "position">("overall");
   return (
-    <section className="data-section match-elo" aria-label="本场 Elo 变化">
+    <section className="data-section match-elo" aria-label="本场段位分变化">
       <div className="data-section-heading">
         <h2>
           <TrendingUp size={18} />
-          本场 Elo 变化
+          本场段位分变化
         </h2>
-        <div className="data-segments" role="group" aria-label="本场 Elo 类型">
+        <div className="data-segments" role="group" aria-label="本场段位分类型">
           <button
             aria-pressed={mode === "overall"}
             onClick={() => setMode("overall")}
           >
-            总 Elo
+            总段位分
           </button>
           <button
             aria-pressed={mode === "position"}
             onClick={() => setMode("position")}
           >
-            位置 Elo
+            位置段位分
           </button>
         </div>
       </div>
@@ -1208,15 +1209,24 @@ export function MatchElo({
                             </button>
                           </td>
                           <td className="elo-number">
-                            {rating ? num(rating.before, 1) : "—"}
+                            {rating ? (
+                              <RankScore points={rating.before} />
+                            ) : (
+                              "—"
+                            )}
                           </td>
                           <td className="elo-number">
-                            {rating ? num(rating.after, 1) : "—"}
+                            {rating?.after !== null &&
+                            rating?.after !== undefined ? (
+                              <RankScore points={rating.after} />
+                            ) : (
+                              "—"
+                            )}
                           </td>
                           <td
                             className={`elo-number ${rating?.delta ? (rating.delta > 0 ? "positive" : "negative") : ""}`}
                           >
-                            {rating ? signed(rating.delta, 1) : "—"}
+                            {rating ? signed(rating.delta, 0) : "—"}
                           </td>
                         </tr>
                       );
@@ -1229,9 +1239,9 @@ export function MatchElo({
       </div>
       <p className="data-table-note">
         {result.rated
-          ? "按完整历史回算至本场；总 Elo 与本场位置 Elo 独立结算。之后的比赛和数据页筛选不改变本场数值；修正历史赛果后重新回算。"
+          ? "总段位分与本场位置段位分独立结算；修正历史赛果后重新回算。"
           : match.status === "finished"
-            ? "本场未定级：Elo 结算需要完整记录双方前锋、后卫的 2 对 2 赛果。"
+            ? "本场未计分：需要完整记录双方前锋、后卫的 2 对 2 赛果。"
             : "赛前评分按本场之前的完赛记录回算，完赛并记录四个位置后结算。"}
       </p>
     </section>
@@ -1288,8 +1298,8 @@ function PositionMatchRows({
                   <td>
                     <button
                       className="icon-btn"
-                      title="查看比赛与 Elo"
-                      aria-label={`查看${match.round}比赛与Elo`}
+                      title="查看比赛与段位分"
+                      aria-label={`查看${match.round}比赛与段位分`}
                       onClick={() => onMatch(match.id)}
                     >
                       <ArrowUpRight size={16} />
@@ -1512,9 +1522,9 @@ function PositionAnalysis({
                 <th>得分占比</th>
                 <th>搭档人数</th>
                 <th>对手人数</th>
-                <th>搭档赛前 Elo</th>
-                <th>对手赛前 Elo</th>
-                <th>Elo 样本</th>
+                <th>搭档赛前段位分</th>
+                <th>对手赛前段位分</th>
+                <th>段位分样本</th>
               </tr>
             </thead>
             <tbody>
@@ -1546,8 +1556,8 @@ function PositionAnalysis({
                     <td>{pct(metrics.goalShare)}</td>
                     <td>{context.partners}</td>
                     <td>{context.opponents}</td>
-                    <td>{num(context.partnerElo, 0)}</td>
-                    <td>{num(context.opponentElo, 0)}</td>
+                    <td>{num(context.partnerRankPoints, 0)}</td>
+                    <td>{num(context.opponentRankPoints, 0)}</td>
                     <td>{context.ratedGames} 场</td>
                   </tr>
                 );
@@ -1559,7 +1569,7 @@ function PositionAnalysis({
         <p className="data-table-note">
           得分占比逐场计算本方得分 ÷ 双方总得分，再取平均；0:0
           不参与该项。胜率区间使用 Wilson 95%
-          区间；搭档、对手强度为有效定级比赛中各场赛前总 Elo
+          区间；搭档、对手强度为有效计分比赛中各场赛前总段位分
           的平均值，对手先取两人均值。区间宽、搭档少时需结合具体阵容判断。
         </p>
       </section>
@@ -1688,9 +1698,9 @@ function PlayerRanking({
     .filter((p) => p[role].games >= minimum)
     .sort((a, b) => {
       const value = (p: PlayerStats) =>
-        sort === "elo"
+        sort === "rank"
           ? p.ratedGames[role]
-            ? p.elo[role]
+            ? p.rankPoints[role]
             : -Infinity
           : (p[role][
               sort as "winRate" | "avgDifference" | "avgFor" | "avgAgainst"
@@ -1712,7 +1722,7 @@ function PlayerRanking({
             <tr>
               <th>排名</th>
               <th>球员</th>
-              <th>Elo</th>
+              <th>段位分</th>
               <th>出场</th>
               <th>胜 / 平 / 负</th>
               <th>胜率</th>
@@ -1747,7 +1757,7 @@ function PlayerRanking({
                 </td>
                 <td>
                   <b className="data-elo">
-                    {p.ratedGames[role] ? Math.round(p.elo[role]) : "—"}
+                    <RankScore points={p.rankPoints[role]} />
                   </b>
                 </td>
                 <td>
@@ -2190,7 +2200,7 @@ function Honors({
     .filter((p) => p.ratedGames.forward >= threshold)
     .sort(
       (a, b) =>
-        b.elo.forward - a.elo.forward ||
+        b.rankPoints.forward - a.rankPoints.forward ||
         b.forward.games - a.forward.games ||
         a.player.id.localeCompare(b.player.id),
     )[0];
@@ -2198,7 +2208,7 @@ function Honors({
     .filter((p) => p.ratedGames.defender >= threshold)
     .sort(
       (a, b) =>
-        b.elo.defender - a.elo.defender ||
+        b.rankPoints.defender - a.rankPoints.defender ||
         b.defender.games - a.defender.games ||
         a.player.id.localeCompare(b.player.id),
     )[0];
@@ -2224,21 +2234,21 @@ function Honors({
         {[
           {
             label: month ? "月度 MVP" : "赛季领跑者",
-            sub: "总 Elo",
+            sub: "总段位分",
             stats: overall,
             role: "overall" as const,
             Icon: Trophy,
           },
           {
             label: "最佳前锋",
-            sub: "前锋 Elo",
+            sub: "前锋段位分",
             stats: forward,
             role: "forward" as const,
             Icon: Target,
           },
           {
             label: "最佳后卫",
-            sub: "后卫 Elo",
+            sub: "后卫段位分",
             stats: defender,
             role: "defender" as const,
             Icon: Shield,
@@ -2256,7 +2266,7 @@ function Honors({
                   <ArrowUpRight size={15} />
                 </button>
                 <strong>
-                  {Math.round(stats.elo[role])}
+                  <RankScore points={stats.rankPoints[role]} />
                   <small>
                     {sub} · {stats[role].games} 场
                   </small>
@@ -2313,8 +2323,10 @@ function Honors({
           >
             <Person player={clubBest.player} />
             <span>
-              <strong>{Math.round(clubBest.elo.overall)}</strong>
-              <small>总 Elo · 当前成员个人赛果</small>
+              <strong>
+                <RankScore points={clubBest.rankPoints.overall} />
+              </strong>
+              <small>总段位分 · 当前成员个人赛果</small>
             </span>
             <ArrowUpRight size={17} />
           </button>
@@ -2350,14 +2362,17 @@ function Methods() {
           </p>
         </div>
         <div>
-          <h3>Elo</h3>
+          <h3>段位分</h3>
           <p>
-            初始 {ELO_BASE}，K = 32；仅完整记录四个位置的 2 对 2
-            比赛定级。队伍强度为两名球员赛前评分均值，预期胜率 E = 1 / (1 +
-            10^((对方均分 − 本方均分) / 400))；每位球员加分 32 × (赛果 − E)，胜
-            / 平 / 负为 1 / 0.5 / 0。总 Elo 和位置 Elo
-            独立计算，按比赛时间排序，同时间按记录时间及 ID
-            排序。筛选范围改变时从 {ELO_BASE} 重算。
+            初始 {RATING_BASE} 分，最低 0
+            分，无定级赛。基础收益随赛前段位分平滑变化：1200 分胜 +32、负
+            −14，1300 分胜 +28、负 −18；1400 分起统一胜 +24、负
+            −24，大师、宗师、王者不再额外增加扣分。战胜强队收益更高，负于弱队扣分更多；个人另有最多
+            ±8 分的追赶修正。净胜球倍率为 1 + 0.5 × 分差 ÷ 胜方得分，0:0 时取
+            1；最终乘倍率并四舍五入。胜场最低加 0 分，
+            负场不会加分；钻石起平局不再固定加分。
+            总段位分与位置段位分独立计算。完整记录四个位置的 2 对 2
+            完赛计分；筛选范围改变时从 {RATING_BASE} 重算。
           </p>
         </div>
         <div>
@@ -2365,7 +2380,7 @@ function Methods() {
           <p>
             关键局为最终分差不超过 2 球的比赛。胜率 = 胜场 /
             完赛场次，平局计入分母。不足 3
-            场标记小样本；无出场、无关键局或未定级显示
+            场标记小样本并正常参与排名；无样本的统计项显示
             —。组合只统计同侧恰好两人的比赛，不拆分多人阵容。
           </p>
         </div>
@@ -2374,8 +2389,8 @@ function Methods() {
           <p>
             维度映射为 0–100：胜率直接取百分数；净胜球为 50 + 50 × tanh(场均净胜
             / 5)；位置表现为胜率与净胜球映射的均值；稳定性为 100 / (1 +
-            净胜球标准差 / 5)，至少 2 场；Elo 为 50 + 50 × tanh((评分 −{" "}
-            {ELO_BASE}) / 200)；得分为 100 × 场均得分 / (场均得分 +
+            净胜球标准差 / 5)，至少 2 场；段位分映射为 50 + 50 × tanh((段位分 −{" "}
+            {RATING_BASE}) / 200)；得分为 100 × 场均得分 / (场均得分 +
             5)，失球控制为 100 / (1 + 场均失分 /
             5)。搭档适配性取不同搭档场均净胜球标准差的反向分数，至少两位各合作 2
             场的搭档。稳定性与适配性描述波动，不代表绝对实力。
@@ -2387,7 +2402,7 @@ function Methods() {
             近期状态按时间取最近 10
             场，左旧右新；平局或负场中断连胜。球员交手只计算双方作为对手的比赛。荣誉至少
             3 场有效样本，MVP / 最佳位置按相应
-            Elo，最佳搭档按胜率、净胜球、出场数排序。月份按北京时间筛选。
+            段位分排序，最佳搭档按胜率、净胜球、出场数排序。月份按北京时间筛选。
           </p>
         </div>
         <div>
@@ -2396,7 +2411,7 @@ function Methods() {
             前后位置组合按明确记录的前锋和后卫分别统计，交换位置视为不同组合。换位对照要求搭档和对方两人不变，且对方位置不变。得分占比为逐场本方得分
             / 双方总得分的平均值，0:0 不参与该项；它不等于进球效率。Wilson 95%
             胜率区间描述抽样不确定性，不能消除固定搭档等比赛安排的影响。搭档与对手强度使用各场赛前总
-            Elo，不使用最新评分回填。
+            段位分，不使用最新分数回填。
           </p>
         </div>
         <div>
@@ -2412,6 +2427,7 @@ function Methods() {
           </p>
         </div>
       </div>
+      <RankLegend />
     </details>
   );
 }

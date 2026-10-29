@@ -629,6 +629,7 @@
 .match-elo-table {
   table-layout: fixed;
   width: 100%;
+  min-width: 365px;
 }
 .match-elo-table th,
 .match-elo-table td {
@@ -636,7 +637,10 @@
   white-space: nowrap;
 }
 .match-elo-table th:first-child {
-  width: 34%;
+  width: 27%;
+}
+.match-elo-table th:last-child {
+  width: 15%;
 }
 .elo-player-name {
   display: flex;
@@ -694,12 +698,26 @@
   .match-elo .data-section-heading {
     flex-wrap: wrap;
   }
+  .match-elo-table {
+    min-width: 0;
+  }
   .match-elo-table th,
   .match-elo-table td {
     padding: 13px 8px;
   }
   .match-elo-table td.elo-number {
     font-size: 18px;
+  }
+  .match-elo-table .rank-score {
+    gap: 4px;
+  }
+  .match-elo-table .tier-emblem {
+    width: 22px;
+    height: 26px;
+    flex-basis: 22px;
+  }
+  .match-elo-table .tier-emblem-face {
+    inset: 1.5px 1.5px 2px;
   }
 }
 .data-empty {
@@ -840,7 +858,7 @@
 }
 .directory-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(96px, 1.4fr) repeat(2, minmax(0, 1fr));
   padding: 18px 0;
   margin: 16px 0;
   border-top: 1px solid #edf0ee;

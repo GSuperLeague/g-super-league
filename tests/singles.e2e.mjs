@@ -171,10 +171,10 @@ try {
   await capture("desktop-live");
   await page.getByRole("button", { name: "结束比赛", exact: true }).click();
   await page
-    .getByRole("heading", { name: "本场 Elo 变化", exact: true })
+    .getByRole("heading", { name: "本场段位分变化", exact: true })
     .waitFor();
   assert.ok(
-    (await page.locator(".singles-elo-result").innerText()).includes("1216"),
+    (await page.locator(".singles-elo-result").innerText()).includes("1248"),
   );
   await page.getByRole("button", { name: "编辑最终比分", exact: true }).click();
   await page.getByLabel("球员 A 得分", { exact: true }).fill("2");
@@ -185,7 +185,7 @@ try {
     .click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   assert.ok(
-    (await page.locator(".singles-elo-result").innerText()).includes("1184"),
+    (await page.locator(".singles-elo-result").innerText()).includes("1182"),
   );
   // Additional results give the comparison and mobile views realistic content.
   for (let i = 0; i < 3; i++) {
@@ -263,7 +263,7 @@ try {
   assert.deepEqual(await read("doubles"), doublesBefore);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: real Worker/D1, player CRUD/avatar, live scoring/own goal/undo, finish/edit/Elo, history, mode isolation, export, desktop/390px/320px layouts",
+    "PASS: real Worker/D1, player CRUD/avatar, live scoring/own goal/undo, finish/edit/rank points, history, mode isolation, export, desktop/390px/320px layouts",
   );
   console.log(`Screenshots: ${artifacts}`);
 } finally {

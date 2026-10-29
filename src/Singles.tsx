@@ -24,6 +24,7 @@ import {
   Users,
 } from "lucide-react";
 import { Modal } from "./App";
+import { RankLegend, RankScore } from "./RankScore";
 import {
   analyzeSingles,
   emptySinglesLeague,
@@ -67,7 +68,7 @@ const dateInput = (time = new Date().toISOString()) =>
     .toLocaleString("sv-SE", { timeZone: "Asia/Shanghai" })
     .slice(0, 16)
     .replace(" ", "T");
-const signed = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)}`;
+const signed = (n: number) => `${n > 0 ? "+" : ""}${n}`;
 const percent = (n: number | null) =>
   n === null ? "—" : `${(n * 100).toFixed(0)}%`;
 const resultLabel = { W: "胜", D: "平", L: "负" };
@@ -139,7 +140,7 @@ function Ranking({
   limit,
 }: {
   rows: SinglesStats[];
-  kind: "points" | "elo";
+  kind: "points" | "rank";
   limit?: number;
 }) {
   return (
@@ -151,7 +152,7 @@ function Ranking({
           <tr>
             <th>排名</th>
             <th className="align-left">球员</th>
-            <th>{kind === "elo" ? "Elo" : "积分"}</th>
+            <th>{kind === "rank" ? "段位分" : "积分"}</th>
             <th>场次</th>
             {!limit && (
               <>
@@ -180,11 +181,11 @@ function Ranking({
                 </td>
                 <td>
                   <strong>
-                    {kind === "elo"
-                      ? s.games
-                        ? Math.round(s.elo)
-                        : "—"
-                      : s.points}
+                    {kind === "rank" ? (
+                      <RankScore points={s.rankPoints} />
+                    ) : (
+                      s.points
+                    )}
                   </strong>
                 </td>
                 <td>{s.games}</td>
@@ -240,7 +241,7 @@ export default function Singles({
     [toast, setToast] = useState("");
   const [query, setQuery] = useState(""),
     [status, setStatus] = useState("all"),
-    [ranking, setRanking] = useState<"points" | "elo">("points");
+    [ranking, setRanking] = useState<"points" | "rank">("points");
   const [month, setMonth] = useState(""),
     [minimum, setMinimum] = useState(0),
     [opponentId, setOpponentId] = useState("");
@@ -321,7 +322,7 @@ export default function Singles({
       !window.confirm(
         type === "player.delete"
           ? "确认删除这位单打球员？"
-          : "确认删除这场单打比赛？积分和 Elo 将重新计算。",
+          : "确认删除这场单打比赛？积分和段位分将重新计算。",
       )
     )
       return;
@@ -620,11 +621,11 @@ export default function Singles({
                     </section>
                     <section className="singles-section">
                       <div className="singles-section-heading">
-                        <h2>单打 Elo 榜</h2>
+                        <h2>单打段位分榜</h2>
                         <button
                           className="text-btn"
                           onClick={() => {
-                            setRanking("elo");
+                            setRanking("rank");
                             go("rankings");
                           }}
                         >
@@ -634,7 +635,7 @@ export default function Singles({
                       </div>
                       <Ranking
                         rows={stats.filter((s) => s.games)}
-                        kind="elo"
+                        kind="rank"
                         limit={5}
                       />
                     </section>
@@ -724,14 +725,14 @@ export default function Singles({
                 <>
                   <div className="singles-toolbar">
                     <div className="data-segments">
-                      {(["points", "elo"] as const).map((key) => (
+                      {(["points", "rank"] as const).map((key) => (
                         <button
                           key={key}
                           aria-pressed={ranking === key}
                           className={ranking === key ? "active" : ""}
                           onClick={() => setRanking(key)}
                         >
-                          {key === "elo" ? "Elo 实力榜" : "个人积分榜"}
+                          {key === "rank" ? "段位分实力榜" : "个人积分榜"}
                         </button>
                       ))}
                     </div>
@@ -740,10 +741,11 @@ export default function Singles({
                   <Ranking rows={filteredStats} kind={ranking} />
                   <p className="singles-caption">
                     {month
-                      ? "当前月份内的赛果从初始 1200 重新计算 Elo。"
-                      : "Elo 初始 1200，K = 32；仅已完赛比赛计入积分和 Elo。"}
+                      ? "当前月份内的赛果从初始 1200 重新计算段位分。"
+                      : "段位分初始 1200，黄金及以下有更高成长收益；钻石及以上基础胜负对称。实际按对手强弱、追赶修正和净胜球倍率结算。"}
                     积分同分依次比较净胜球、进球数。
                   </p>
+                  {ranking === "rank" && <RankLegend />}
                 </>
               )}
               {page === "players" && !selectedId && (
@@ -774,8 +776,10 @@ export default function Singles({
                           <Person player={s.player} />
                           <dl>
                             <div>
-                              <dt>Elo</dt>
-                              <dd>{s.games ? Math.round(s.elo) : "—"}</dd>
+                              <dt>段位分</dt>
+                              <dd>
+                                <RankScore points={s.rankPoints} />
+                              </dd>
                             </div>
                             <div>
                               <dt>场次</dt>
@@ -847,8 +851,8 @@ export default function Singles({
                     <Metrics
                       items={[
                         [
-                          "单打 Elo",
-                          profile.games ? Math.round(profile.elo) : "—",
+                          "单打段位分",
+                          <RankScore points={profile.rankPoints} showTier />,
                         ],
                         ["积分", profile.points],
                         ["胜率", percent(profile.winRate)],
@@ -886,7 +890,7 @@ export default function Singles({
                         )}
                       </section>
                       <section className="singles-section">
-                        <h2>Elo 变化</h2>
+                        <h2>段位分变化</h2>
                         <div className="singles-rating-history">
                           {profile.history
                             .slice(-10)
@@ -900,7 +904,9 @@ export default function Singles({
                                   {dateLabel(h.match.time)} · 对阵{" "}
                                   {player(h.opponentId)?.name}
                                 </span>
-                                <b>{Math.round(h.after)}</b>
+                                <b>
+                                  <RankScore points={h.after} />
+                                </b>
                                 <span
                                   className={
                                     h.delta >= 0 ? "positive" : "negative"
@@ -993,7 +999,7 @@ export default function Singles({
                         </tr>
                       </thead>
                       <tbody>
-                        {singlesStandings(filteredStats, "elo").map((s) => (
+                        {singlesStandings(filteredStats, "rank").map((s) => (
                           <tr key={s.player.id}>
                             <td>
                               <button
@@ -1646,7 +1652,7 @@ function MatchDetail({
                 onClick={() => {
                   if (
                     window.confirm(
-                      "重新打开比赛后，将暂时移出积分和 Elo 统计。确认继续？",
+                      "重新打开比赛后，将暂时移出积分和段位分统计。确认继续？",
                     )
                   )
                     action("match.reopen");
@@ -1678,7 +1684,7 @@ function MatchDetail({
       )}
       {match.status === "finished" && (
         <section className="singles-section">
-          <h2>本场 Elo 变化</h2>
+          <h2>本场段位分变化</h2>
           <div className="singles-elo-result">
             {[match.homeId, match.awayId].map((id) => {
               const h = stats
@@ -1688,8 +1694,9 @@ function MatchDetail({
                 h && (
                   <div key={id}>
                     <Person player={player(id)} />
-                    <span>
-                      {Math.round(h.before)} → {Math.round(h.after)}
+                    <span className="rank-result-scores">
+                      <RankScore points={h.before} /> →{" "}
+                      <RankScore points={h.after} />
                     </span>
                     <b className={h.delta >= 0 ? "positive" : "negative"}>
                       {signed(h.delta)}

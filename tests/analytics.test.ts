@@ -93,35 +93,46 @@ test("personal and role metrics use team scores, with no fabricated personal goa
   );
 });
 
-test("Elo uses pre-match team averages, and edits/deletion replay the full history", () => {
+test("MMR uses weighted pre-match team averages, and edits/deletion replay both ratings", () => {
   const first = applyAction(fixture(), result());
   const a = analyzeLeague(first);
-  assert.equal(a.players[0].elo.overall, 1216);
-  assert.equal(a.players[1].elo.defender, 1216);
-  assert.equal(a.players[2].elo.overall, 1184);
-  assert.equal(a.players[0].elo.defender, 1200);
+  // At 8:5, margin = 1.1875, MMR = 32 * margin, RP = +32/-14 * margin.
+  assert.equal(a.players[0].mmr.overall, 1238);
+  assert.equal(a.players[1].mmr.defender, 1238);
+  assert.equal(a.players[2].mmr.overall, 1162);
+  assert.equal(a.players[0].rankPoints.overall, 1238);
+  assert.equal(a.players[1].rankPoints.defender, 1238);
+  assert.equal(a.players[2].rankPoints.overall, 1183);
+  assert.equal(a.players[0].rankPoints.defender, 1200);
   assert.equal(
-    a.players.reduce((sum, p) => sum + p.elo.overall, 0),
+    a.players.reduce((sum, p) => sum + p.rankPoints.overall, 0),
+    6042,
+  );
+  assert.equal(a.players[0].mmr.defender, 1200);
+  assert.equal(
+    a.players.reduce((sum, p) => sum + p.mmr.overall, 0),
     6000,
   );
   let next = applyAction(
     structuredClone(first),
     result("m2", { time: "2026-10-19T11:00:00Z" }),
   );
-  const increased = analyzeLeague(next).players[0].elo.overall;
-  assert.ok(increased > 1216 && increased < 1232);
+  const increased = analyzeLeague(next).players[0].mmr.overall;
+  assert.ok(increased > 1238 && increased < 1276);
   const reverseOrder = { ...next, matches: [...next.matches].reverse() };
-  assert.deepEqual(
-    analyzeLeague(reverseOrder).players.map((p) => p.elo),
-    analyzeLeague(next).players.map((p) => p.elo),
-  );
+  assert.deepEqual(analyzeLeague(reverseOrder), analyzeLeague(next));
   next = applyAction(next, { type: "match.delete", id: "m2" });
   assert.deepEqual(
-    analyzeLeague(next).players.map((p) => p.elo),
-    a.players.map((p) => p.elo),
+    analyzeLeague(next).players.map((p) => p.mmr),
+    a.players.map((p) => p.mmr),
+  );
+  assert.deepEqual(
+    analyzeLeague(next).players.map((p) => p.rankPoints),
+    a.players.map((p) => p.rankPoints),
   );
   next = applyAction(next, result("m1", { homeScore: 5, awayScore: 8 }));
-  assert.equal(analyzeLeague(next).players[0].elo.overall, 1184);
+  assert.equal(analyzeLeague(next).players[0].mmr.overall, 1162);
+  assert.equal(analyzeLeague(next).players[0].rankPoints.overall, 1183);
 });
 
 test("strong opponents reward upset wins more, while draws conserve rating", () => {
@@ -131,12 +142,126 @@ test("strong opponents reward upset wins more, while draws conserve rating", () 
     result("m2", { time: "2026-10-19T11:00:00Z", homeScore: 4, awayScore: 8 }),
   );
   const p3 = analyzeLeague(league).players[2];
-  assert.ok(p3.elo.overall > 1200);
+  assert.ok(p3.mmr.overall > 1200);
   const drawn = analyzeLeague(
     applyAction(fixture(), result("m", { homeScore: 5, awayScore: 5 })),
   );
-  assert.ok(drawn.players.every((p) => p.elo.overall === 1200));
+  assert.ok(drawn.players.every((p) => p.mmr.overall === 1200));
+  assert.equal(drawn.players[0].rankPoints.overall, 1204);
+  assert.equal(drawn.players[2].rankPoints.overall, 1204);
   assert.equal(drawn.players[0].overall.closeWinRate, 0);
+});
+
+test("teammates share MMR changes but get individual pre-match catch-up adjustments", () => {
+  let league = fixture();
+  for (let i = 0; i < 6; i++)
+    league = applyAction(
+      league,
+      result(`warmup${i}`, {
+        time: `2026-10-19T10:0${i}:00Z`,
+        homeScore: 10,
+        awayScore: 0,
+      }),
+    );
+  const before = analyzeLeague(league).players;
+  league = applyAction(
+    league,
+    result("mixed", {
+      time: "2026-10-19T11:00:00Z",
+      homeDefenderId: "p5",
+      homeScore: 10,
+      awayScore: 0,
+    }),
+  );
+  const after = analyzeLeague(league).players;
+  assert.equal(after[0].rankPoints.overall - before[0].rankPoints.overall, 16);
+  assert.ok(
+    after[4].rankPoints.overall - before[4].rankPoints.overall >
+      after[0].rankPoints.overall - before[0].rankPoints.overall,
+  );
+  assert.ok(
+    Math.abs(
+      after[0].mmr.overall -
+        before[0].mmr.overall -
+        (after[4].mmr.overall - before[4].mmr.overall),
+    ) < 1e-10,
+  );
+  assert.equal(after[4].ratedGames.overall, 1);
+  assert.equal(after[4].rankPoints.defender, after[4].rankPoints.overall);
+  assert.equal(after[4].rankPoints.forward, 1200);
+});
+
+test("doubles settlement is invariant to changing sides and roster iteration order", () => {
+  let league = applyAction(fixture(), result());
+  league = applyAction(
+    league,
+    result("m2", {
+      time: "2026-10-19T11:00:00Z",
+      homeDefenderId: "p5",
+      awayForwardId: "p2",
+      homeScore: 3,
+      awayScore: 8,
+    }),
+  );
+  league = applyAction(
+    league,
+    result("m3", {
+      time: "2026-10-19T12:00:00Z",
+      homeForwardId: "p2",
+      homeDefenderId: "p3",
+      awayForwardId: "p5",
+      awayDefenderId: "p1",
+      homeScore: 5,
+      awayScore: 5,
+    }),
+  );
+  const swapped = structuredClone(league);
+  for (const m of swapped.matches) {
+    [m.homeId, m.awayId] = [m.awayId, m.homeId];
+    [m.homePlayers, m.awayPlayers] = [m.awayPlayers, m.homePlayers];
+    const s = m.summary!;
+    [s.homeScore, s.awayScore] = [s.awayScore, s.homeScore];
+    [s.homeForwardId, s.awayForwardId] = [s.awayForwardId, s.homeForwardId];
+    [s.homeDefenderId, s.awayDefenderId] = [s.awayDefenderId, s.homeDefenderId];
+  }
+  const reordered = structuredClone(league);
+  reordered.players.reverse();
+  for (const m of reordered.matches) {
+    m.homePlayers.reverse();
+    m.awayPlayers.reverse();
+  }
+  const settled = (source: League) =>
+    analyzeLeague(source)
+      .players.map((p) => ({
+        id: p.player.id,
+        mmr: p.mmr,
+        rankPoints: p.rankPoints,
+        ratedGames: p.ratedGames,
+        history: p.history.map((h) => ({
+          rankBefore: h.rankBefore,
+          rankPoints: h.rankPoints,
+          roleRankBefore: h.roleRankBefore,
+          roleRankPoints: h.roleRankPoints,
+          partnerRankBefore: h.partnerRankBefore,
+          opponentRankBefore: h.opponentRankBefore,
+        })),
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  assert.deepEqual(settled(swapped), settled(league));
+  assert.deepEqual(settled(reordered), settled(league));
+  const matchSettlements = (source: League) =>
+    source.matches.map((m) =>
+      matchRatings(source, m)
+        .players.map(({ playerId, role, overall, position }) => ({
+          playerId,
+          role,
+          overall,
+          position,
+        }))
+        .sort((a, b) => a.playerId.localeCompare(b.playerId)),
+    );
+  assert.deepEqual(matchSettlements(swapped), matchSettlements(league));
+  assert.deepEqual(matchSettlements(reordered), matchSettlements(league));
 });
 
 test("pair and opponent records are symmetric and pickup is excluded from team encounters", () => {
@@ -171,7 +296,7 @@ test("legacy results count overall appearances without guessing roles or splitti
   assert.equal(data.ratedMatches, 0);
   assert.equal(data.pairs.length, 1);
   assert.equal(relationships(data.players[0], "partner").length, 0);
-  assert.ok(data.players.every((p) => p.elo.overall === 1200));
+  assert.ok(data.players.every((p) => p.mmr.overall === 1200));
   const league2 = structuredClone(league);
   league2.players[0].position = "前锋";
   assert.deepEqual(
@@ -337,18 +462,15 @@ test("match ratings preserve before/after values, separate position ratings, and
   assert.equal(second.rated, true);
   const p1 = second.players.find((p) => p.playerId === "p1")!;
   assert.equal(p1.role, "defender");
-  assert.equal(p1.overall.before, 1216);
+  assert.equal(p1.overall.before, 1238);
   assert.equal(p1.position!.before, 1200);
   assert.notEqual(p1.overall.delta, p1.position!.delta);
   assert.equal(p1.overall.after! - p1.overall.before, p1.overall.delta);
-  assert.ok(
-    Math.abs(second.players.reduce((sum, p) => sum + p.overall.delta!, 0)) <
-      1e-10,
-  );
+  assert.ok(second.players.reduce((sum, p) => sum + p.overall.delta!, 0) > 0);
   assert.deepEqual(matchRatings(league, league.matches[0]).players[0].overall, {
     before: 1200,
-    after: 1216,
-    delta: 16,
+    after: 1238,
+    delta: 38,
   });
   league = applyAction(
     league,
@@ -367,7 +489,7 @@ test("match ratings preserve before/after values, separate position ratings, and
     matchRatings(league, league.matches[1]).players.find(
       (p) => p.playerId === "p1",
     )!.overall.before,
-    1184,
+    1179,
   );
   league = applyAction(league, { type: "match.delete", id: "m1" });
   assert.equal(
@@ -390,7 +512,7 @@ test("unsettled and ineligible games have no fabricated Elo change", () => {
   };
   const resultPending = matchRatings(league, pending);
   assert.equal(resultPending.rated, false);
-  assert.equal(resultPending.players[0].overall.before, 1216);
+  assert.equal(resultPending.players[0].overall.before, 1238);
   assert.equal(resultPending.players[0].overall.after, null);
   assert.equal(resultPending.players[0].overall.delta, null);
   assert.equal(resultPending.players[0].position, null);
@@ -410,17 +532,17 @@ test("opponent and partner context uses historical pre-match ratings and recorde
   let league = applyAction(fixture(), result());
   league = applyAction(league, result("m2", { time: "2026-10-19T11:00:00Z" }));
   const stats = analyzeLeague(league).players[0];
-  assert.equal(stats.history[1].eloBefore, 1216);
-  assert.equal(stats.history[1].roleEloBefore, 1216);
+  assert.equal(stats.history[1].rankBefore, 1238);
+  assert.equal(stats.history[1].roleRankBefore, 1238);
   const context = positionContext(stats, "forward");
   assert.deepEqual(context, {
     partners: 1,
     opponents: 2,
     ratedGames: 2,
-    partnerElo: 1208,
-    opponentElo: 1192,
+    partnerRankPoints: 1219,
+    opponentRankPoints: 1191.5,
   });
-  assert.equal(positionContext(stats, "defender").partnerElo, null);
+  assert.equal(positionContext(stats, "defender").partnerRankPoints, null);
   league = applyAction(league, result("m3", { time: "2026-10-19T12:00:00Z" }));
   assert.deepEqual(
     analyzeLeague(league).players[0].history.slice(0, 2),
@@ -428,7 +550,7 @@ test("opponent and partner context uses historical pre-match ratings and recorde
   );
 });
 
-test("Elo depends on results and lineups, not winning margin or manual player attributes", () => {
+test("relative winning margin scales MMR and rank points without using manual attributes", () => {
   const small = applyAction(
     fixture(),
     result("m1", { homeScore: 7, awayScore: 6 }),
@@ -440,8 +562,18 @@ test("Elo depends on results and lineups, not winning margin or manual player at
   large.players[0].skills = [100, 100, 100, 100, 100, 100];
   large.players[0].value = 999;
   large.players[0].position = "后卫";
+  const narrow = analyzeLeague(small).players[0];
+  const wide = analyzeLeague(large).players[0];
+  assert.ok(wide.mmr.overall > narrow.mmr.overall);
+  assert.ok(wide.rankPoints.overall > narrow.rankPoints.overall);
+  assert.equal(wide.mmr.forward, 1248);
+  assert.equal(wide.rankPoints.forward, 1248);
+  const sameMargin = applyAction(
+    fixture(),
+    result("m1", { homeScore: 7, awayScore: 0 }),
+  );
   assert.deepEqual(
-    analyzeLeague(small).players.map((p) => p.elo),
-    analyzeLeague(large).players.map((p) => p.elo),
+    analyzeLeague(sameMargin).players.map((p) => [p.mmr, p.rankPoints]),
+    analyzeLeague(large).players.map((p) => [p.mmr, p.rankPoints]),
   );
 });

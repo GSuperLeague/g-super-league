@@ -13,6 +13,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:e2e": "node tests/singles.e2e.mjs",
+    "test:e2e:rank": "node --experimental-strip-types tests/rankings.e2e.mjs",
     "api:dev": "wrangler dev --config backend/wrangler.jsonc",
     "api:deploy": "node scripts/check-db-config.mjs && wrangler deploy --config backend/wrangler.jsonc",
     "db:local": "wrangler d1 migrations apply DB --local --config backend/wrangler.jsonc",

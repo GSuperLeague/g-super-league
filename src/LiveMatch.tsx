@@ -21,7 +21,7 @@ export function LiveMatchForm({initial,teams,players,busy,onSave}:{initial?:Matc
   const f=new FormData(e.currentTarget);
   onSave({matchId,kind,homeId:home,awayId:away,roles,homePlayers:[roles.homeForwardId,roles.homeDefenderId],awayPlayers:[roles.awayForwardId,roles.awayDefenderId],round:f.get('round'),time:new Date(`${f.get('time')}:00+08:00`).toISOString(),startNow:(e.nativeEvent as SubmitEvent).submitter?.getAttribute('value')==='live'});
  }}>
-  <div className="live-intro"><Play size={20}/><div><b>先定阵容，再开球</b><p>每队一名前锋、一名后卫。逐球记录真实进球人；完赛后更新 Elo、搭档数据和榜单。</p></div></div>
+  <div className="live-intro"><Play size={20}/><div><b>先定阵容，再开球</b><p>每队一名前锋、一名后卫。逐球记录真实进球人；完赛后更新段位分、搭档数据和榜单。</p></div></div>
   <div className="tabs live-kind" aria-label="比赛类型">{(['regular','pickup'] as const).map(k=><button key={k} type="button" disabled={!!initial} aria-pressed={kind===k} className={kind===k?'active':''} onClick={()=>{setKind(k);setRoles({...emptyRoles})}}>{k==='regular'?'常驻球队对决':'临时组队 · A / B'}</button>)}</div>
   <div className="form-grid"><label>比赛名称<input name="round" defaultValue={initial?.round||'常规赛'} maxLength={30} required/></label><label>开赛时间（北京时间）<input name="time" type="datetime-local" defaultValue={dateInput(initial?.time)} required/></label></div>
   <div className="form-grid live-lineups">{(['home','away'] as const).map(side=>{

@@ -8,7 +8,8 @@ import {
   singlesStandings,
 } from "../lib/singles.ts";
 import type { SinglesLeague } from "../lib/singles.ts";
-import { emptyLeague } from "../lib/league.ts";
+import { applyAction, emptyLeague } from "../lib/league.ts";
+import { analyzeLeague } from "../lib/analytics.ts";
 
 function fixture() {
   let s = emptySinglesLeague();
@@ -113,7 +114,7 @@ test("live scores and own goals are idempotent, undoable, and excluded from rati
   s = applySinglesAction(s, add);
   assert.deepEqual(singlesScore(s.matches[0]), [1, 0]);
   let stats = analyzeSingles(s);
-  assert.equal(stats[0].elo, 1200);
+  assert.equal(stats[0].mmr, 1200);
   assert.equal(stats[0].points, 0);
   assert.equal(stats[1].ownGoals, 1);
   assert.throws(
@@ -127,15 +128,19 @@ test("live scores and own goals are idempotent, undoable, and excluded from rati
   );
   s = applySinglesAction(s, { type: "match.finish", id: "m" });
   stats = analyzeSingles(s);
-  assert.equal(stats[0].elo, 1216);
-  assert.equal(stats[1].elo, 1184);
+  assert.equal(stats[0].mmr, 1248);
+  assert.equal(stats[1].mmr, 1152);
+  assert.equal(stats[0].rankPoints, 1248);
+  assert.equal(stats[1].rankPoints, 1179);
+  assert.equal(stats[0].history[0].delta, 48);
+  assert.equal(stats[1].history[0].delta, -21);
   assert.equal(stats[0].points, 3);
   assert.throws(
     () => applySinglesAction(s, { type: "goal.delete", id: "m", goalId: "g" }),
     /重新打开/,
   );
   s = applySinglesAction(s, { type: "match.reopen", id: "m" });
-  assert.equal(analyzeSingles(s)[0].elo, 1200);
+  assert.equal(analyzeSingles(s)[0].mmr, 1200);
   s = applySinglesAction(s, { type: "goal.delete", id: "m", goalId: "g" });
   assert.deepEqual(singlesScore(s.matches[0]), [0, 0]);
   assert.equal(analyzeSingles(s)[1].ownGoals, 0);
@@ -171,17 +176,18 @@ test("editing and deleting old results replays Elo, points, streaks and opponent
   let stats = analyzeSingles(s);
   assert.equal(stats[0].points, 6);
   assert.equal(stats[0].bestStreak, 2);
-  assert.equal(stats[0].history[1].before, 1216);
-  assert.equal(stats[0].elo + stats[1].elo, 2400);
+  assert.equal(stats[0].history[1].before, 1238);
+  assert.equal(stats[0].mmr + stats[1].mmr, 2400);
   s = result(s, "first", 2, 8, "2026-10-25T10:00:00+08:00");
   stats = analyzeSingles(s);
   assert.equal(stats[0].points, 3);
   assert.equal(stats[0].bestStreak, 1);
-  assert.equal(stats[0].history[1].before, 1184);
-  assert.ok(stats[0].history[1].delta > 16);
+  assert.equal(stats[0].history[1].before, 1181);
+  assert.equal(stats[0].history[1].delta, 49);
   s = applySinglesAction(s, { type: "match.delete", id: "first" });
   stats = analyzeSingles(s);
-  assert.equal(stats[0].elo, 1216);
+  assert.equal(stats[0].mmr, 1240);
+  assert.equal(stats[0].rankPoints, 1240);
   assert.equal(stats[0].games, 1);
   assert.equal(stats[0].history[0].opponentId, "b");
 });
@@ -193,10 +199,111 @@ test("draws, custom points and rating order use completed singles results only",
     data: { season: "S", win: 5, draw: 2, loss: 1 },
   });
   const stats = analyzeSingles(s);
-  assert.equal(stats[0].elo, 1200);
+  assert.equal(stats[0].mmr, 1200);
+  assert.equal(stats[0].rankPoints, 1204);
   assert.equal(stats[0].points, 2);
   assert.equal(stats[0].draws, 1);
-  assert.equal(singlesStandings(stats, "elo").at(-1)!.player.id, "c");
+  assert.equal(singlesStandings(stats, "rank").at(-1)!.player.id, "c");
   assert.throws(() => result(s, "bad", -1, 3));
   assert.throws(() => result(s, "bad", 1.5, 3));
+});
+
+test("singles settlement uses pre-match values independently of home/away orientation", () => {
+  let league = result(fixture(), "first", 8, 5, "2026-10-25T10:00:00+08:00");
+  league = applySinglesAction(league, {
+    type: "match.result",
+    id: "second",
+    data: { ...match("a", "c"), homeScore: 3, awayScore: 8 },
+  });
+  league = applySinglesAction(league, {
+    type: "match.result",
+    id: "third",
+    data: {
+      ...match("b", "c", "2026-10-26T11:00:00+08:00"),
+      homeScore: 5,
+      awayScore: 5,
+    },
+  });
+  const swapped = structuredClone(league);
+  swapped.players.reverse();
+  for (const m of swapped.matches) {
+    [m.homeId, m.awayId] = [m.awayId, m.homeId];
+    [m.summary!.homeScore, m.summary!.awayScore] = [
+      m.summary!.awayScore,
+      m.summary!.homeScore,
+    ];
+  }
+  const expected = analyzeSingles(league);
+  for (const actual of analyzeSingles(swapped)) {
+    const original = expected.find((p) => p.player.id === actual.player.id)!;
+    assert.ok(Math.abs(actual.mmr - original.mmr) < 1e-10);
+    assert.equal(actual.rankPoints, original.rankPoints);
+    assert.deepEqual(
+      actual.history.map(({ match: _, ...h }) => h),
+      original.history.map(({ match: _, ...h }) => h),
+    );
+  }
+});
+
+test("singles and doubles first-match settlements match hand-calculated score anchors", () => {
+  const anchors = [
+    { score: [8, 5], mmr: [1238, 1162], rank: [1238, 1183] },
+    { score: [10, 0], mmr: [1248, 1152], rank: [1248, 1179] },
+    { score: [5, 8], mmr: [1162, 1238], rank: [1183, 1238] },
+    { score: [2, 5], mmr: [1158.4, 1241.6], rank: [1182, 1242] },
+    { score: [0, 0], mmr: [1200, 1200], rank: [1204, 1204] },
+  ];
+  for (const anchor of anchors) {
+    const [homeScore, awayScore] = anchor.score;
+    const singles = analyzeSingles(result(fixture(), "m", homeScore, awayScore));
+    let doubles = emptyLeague();
+    doubles.teams = ["home", "away"].map((id) => ({
+      id,
+      name: id,
+      short: id,
+      color: "#365c49",
+      bio: "",
+    }));
+    doubles.players = ["a", "partner-a", "b", "partner-b"].map((id, i) => ({
+      id,
+      name: id,
+      nickname: "",
+      number: i,
+      teamIds: [i < 2 ? "home" : "away"],
+      position: "全能型",
+      value: 0,
+      bio: "",
+      photo: "",
+      skills: [50, 50, 50, 50, 50, 50],
+    }));
+    doubles = applyAction(doubles, {
+      type: "match.result",
+      id: "m",
+      data: {
+        homeId: "home",
+        awayId: "away",
+        time: "2026-10-26T10:00:00+08:00",
+        round: "1",
+        homeForwardId: "a",
+        homeDefenderId: "partner-a",
+        awayForwardId: "b",
+        awayDefenderId: "partner-b",
+        homeScore,
+        awayScore,
+      },
+    });
+    const paired = analyzeLeague(doubles).players;
+    for (const [side, id] of ["a", "b"].entries()) {
+      const single = singles.find((p) => p.player.id === id)!;
+      const pair = paired.find((p) => p.player.id === id)!;
+      assert.equal(single.mmr, anchor.mmr[side]);
+      assert.equal(single.rankPoints, anchor.rank[side]);
+      assert.equal(pair.mmr.overall, anchor.mmr[side]);
+      assert.equal(pair.rankPoints.overall, anchor.rank[side]);
+      assert.equal(pair.mmr.forward, anchor.mmr[side]);
+      assert.equal(pair.rankPoints.forward, anchor.rank[side]);
+      assert.equal(single.history[0].before, 1200);
+      assert.equal(single.history[0].delta, anchor.rank[side] - 1200);
+    }
+  }
 });

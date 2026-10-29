@@ -1,4 +1,11 @@
 import type { Goal, League, Player } from "./league.ts";
+import {
+  RATING_BASE,
+  expectedResult,
+  marginMultiplier,
+  mmrChange,
+  nextRankPoints,
+} from "./rating.ts";
 
 export type SinglesPlayer = Pick<
   Player,
@@ -28,8 +35,6 @@ export type SinglesAction = {
   data?: unknown;
   goalId?: string;
 };
-export const SINGLES_ELO_BASE = 1200;
-export const SINGLES_ELO_K = 32;
 export const emptySinglesLeague = (): SinglesLeague => ({
   mode: "singles",
   teams: [],
@@ -229,7 +234,8 @@ export type SinglesStats = {
   ga: number;
   gd: number;
   points: number;
-  elo: number;
+  rankPoints: number;
+  mmr: number;
   winRate: number | null;
   ownGoals: number;
   streak: number;
@@ -250,7 +256,8 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
         ga: 0,
         gd: 0,
         points: 0,
-        elo: SINGLES_ELO_BASE,
+        rankPoints: RATING_BASE,
+        mmr: RATING_BASE,
         winRate: null,
         ownGoals: 0,
         streak: 0,
@@ -275,14 +282,22 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
     if (!home || !away || home === away) continue;
     const [a, b] = singlesScore(match),
       actual = a > b ? 1 : a < b ? 0 : 0.5;
-    const delta =
-      SINGLES_ELO_K * (actual - 1 / (1 + 10 ** ((away.elo - home.elo) / 400)));
+    const multiplier = marginMultiplier(a, b);
+    const delta = mmrChange(home.mmr, away.mmr, actual, multiplier);
+    const homeExpected = expectedResult(home.mmr, away.mmr);
     for (const [self, opponent, gf, ga, change] of [
       [home, away, a, b, delta],
       [away, home, b, a, -delta],
     ] as const) {
       const result = gf > ga ? "W" : gf < ga ? "L" : "D";
-      const before = self.elo;
+      const before = self.rankPoints;
+      self.rankPoints = nextRankPoints(
+        before,
+        self.mmr,
+        gf > ga ? 1 : gf < ga ? 0 : 0.5,
+        multiplier,
+        self === home ? homeExpected : 1 - homeExpected,
+      );
       self.games++;
       self.gf += gf;
       self.ga += ga;
@@ -295,7 +310,7 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
         self.draws * s.settings.draw +
         self.losses * s.settings.loss;
       self.winRate = self.wins / self.games;
-      self.elo += change;
+      self.mmr += change;
       self.streak = result === "W" ? self.streak + 1 : 0;
       self.bestStreak = Math.max(self.bestStreak, self.streak);
       self.history.push({
@@ -305,8 +320,8 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
         ga,
         result,
         before,
-        after: self.elo,
-        delta: change,
+        after: self.rankPoints,
+        delta: self.rankPoints - before,
       });
     }
   }
@@ -314,12 +329,12 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
 }
 export function singlesStandings(
   stats: SinglesStats[],
-  by: "points" | "elo" = "points",
+  by: "points" | "rank" = "points",
 ): SinglesStats[] {
   return [...stats].sort((a, b) =>
-    by === "elo"
+    by === "rank"
       ? Number(b.games > 0) - Number(a.games > 0) ||
-        b.elo - a.elo ||
+        b.rankPoints - a.rankPoints ||
         b.games - a.games ||
         a.player.id.localeCompare(b.player.id)
       : b.points - a.points ||

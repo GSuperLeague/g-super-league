@@ -1,0 +1,762 @@
+.rank-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  vertical-align: middle;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+}
+.rank-score-value {
+  color: inherit;
+  font: inherit;
+}
+.rank-score-tier {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted, #69756e);
+}
+.rank-score-labeled {
+  display: inline-grid;
+  grid-template-columns: 32px auto;
+  gap: 2px 7px;
+  text-align: left;
+}
+.rank-score-labeled .tier-emblem {
+  grid-row: 1 / 3;
+}
+.rank-score-labeled .rank-score-tier {
+  grid-column: 2;
+}
+.tier-emblem {
+  --metal-light: #c9d6da;
+  --metal: #81949c;
+  --metal-dark: #40515a;
+  --metal-ink: #d7e2e6;
+  --enamel-light: #596b75;
+  --enamel: #2c3c45;
+  --enamel-dark: #17232b;
+  --jewel: #d3e4e9;
+  --aura: #b5edff;
+  --crest: polygon(50% 0, 96% 17%, 88% 73%, 50% 100%, 12% 73%, 4% 17%);
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 34px;
+  flex: 0 0 32px;
+  isolation: isolate;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 1px #182c3038);
+}
+.tier-emblem-frame {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 76%;
+  height: 84%;
+  clip-path: var(--crest);
+  background:
+    linear-gradient(
+      115deg,
+      #fff9,
+      transparent 32%,
+      #fff0 60%,
+      #fff7 61%,
+      transparent 64%
+    ),
+    conic-gradient(
+      from 135deg at 50% 42%,
+      var(--metal-dark),
+      var(--metal) 12%,
+      var(--metal-light) 24%,
+      #fff 26%,
+      var(--metal) 33%,
+      var(--metal-dark) 48%,
+      var(--metal-light) 62%,
+      var(--metal) 76%,
+      var(--metal-light) 87%,
+      var(--metal-dark)
+    );
+  transition:
+    transform 240ms ease,
+    filter 240ms ease;
+  transform-origin: 50% 70%;
+}
+.tier-emblem-face {
+  position: absolute;
+  inset: 2px 2px 3px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(115deg, #ffffff06 0 1px, transparent 1px 3px),
+    linear-gradient(
+      155deg,
+      var(--enamel-light),
+      var(--enamel) 48%,
+      var(--enamel-dark)
+    );
+  color: var(--metal-ink);
+  clip-path: var(--crest);
+}
+.tier-emblem-face::before,
+.tier-emblem-face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.tier-emblem-face::before {
+  background: linear-gradient(130deg, #ffffff60, #ffffff08 55%, #0003);
+  clip-path: polygon(0 0, 50% 12%, 42% 58%, 0 86%);
+}
+.tier-emblem-face::after {
+  background:
+    linear-gradient(145deg, transparent 45%, #fff3 46%, #fff0 48%),
+    linear-gradient(35deg, #0005, transparent 60%);
+  clip-path: polygon(42% 58%, 100% 24%, 100% 100%, 50% 100%);
+}
+.tier-emblem-face svg {
+  position: relative;
+  z-index: 1;
+  width: 66%;
+  height: 66%;
+  margin-top: -5%;
+  filter: drop-shadow(0 1px 0 #0009) drop-shadow(0 0 1px var(--metal));
+}
+.tier-emblem-sheen {
+  position: absolute;
+  z-index: 2;
+  inset: -45% -100%;
+  background: linear-gradient(
+    110deg,
+    transparent 34%,
+    #fff1 40%,
+    #ffffffa3 48%,
+    #fff2 51%,
+    transparent 58%
+  );
+  opacity: 0;
+  transform: translateX(-65%);
+  animation: tier-sheen 7.5s ease-in-out infinite;
+  animation-delay: var(--shine-phase, 0s);
+}
+.tier-emblem-jewel {
+  position: absolute;
+  z-index: 4;
+  left: 45%;
+  bottom: 20%;
+  width: 10%;
+  height: 9%;
+  background: var(--jewel);
+  box-shadow:
+    0 0 2px var(--metal-light),
+    inset -1px -1px 0 #0004;
+  transform: rotate(45deg);
+}
+.tier-emblem-aura,
+.tier-emblem-wings,
+.tier-emblem-mantle,
+.tier-emblem-collar {
+  display: none;
+  position: absolute;
+  pointer-events: none;
+}
+.tier-emblem-wings {
+  z-index: 1;
+  inset: 20% 0 15%;
+  background:
+    linear-gradient(163deg, transparent 20%, #fff9 21%, transparent 25%),
+    linear-gradient(197deg, transparent 20%, #fff9 21%, transparent 25%),
+    linear-gradient(
+      145deg,
+      var(--metal-light),
+      var(--metal) 42%,
+      var(--metal-dark) 64%,
+      var(--metal-light)
+    );
+  clip-path: polygon(
+    0 0,
+    28% 21%,
+    50% 13%,
+    72% 21%,
+    100% 0,
+    90% 40%,
+    80% 76%,
+    50% 100%,
+    20% 76%,
+    10% 40%
+  );
+}
+.tier-emblem-mantle {
+  z-index: 0;
+  inset: 4% 5% 5%;
+  background:
+    linear-gradient(140deg, #fff6, transparent 34%, #fff8 45%, transparent 47%),
+    linear-gradient(
+      45deg,
+      var(--metal-dark),
+      var(--metal-light) 45%,
+      var(--metal)
+    );
+  clip-path: polygon(
+    50% 0,
+    62% 22%,
+    92% 10%,
+    86% 65%,
+    66% 87%,
+    50% 100%,
+    34% 87%,
+    14% 65%,
+    8% 10%,
+    38% 22%
+  );
+}
+.tier-emblem-collar {
+  z-index: 3;
+  left: 29%;
+  right: 29%;
+  bottom: 11%;
+  height: 18%;
+  background: linear-gradient(
+    160deg,
+    var(--metal-light),
+    var(--metal) 48%,
+    var(--metal-dark)
+  );
+  clip-path: polygon(
+    0 0,
+    30% 25%,
+    50% 0,
+    70% 25%,
+    100% 0,
+    83% 60%,
+    50% 100%,
+    17% 60%
+  );
+}
+.tier-emblem-coronet {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 29%;
+  width: 42%;
+  height: 28%;
+  color: var(--metal-light);
+  filter: drop-shadow(0 1px 0 var(--metal-dark));
+}
+.tier-emblem-coronet svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: var(--enamel);
+}
+.tier-iron .tier-emblem-frame {
+  width: 66%;
+  height: 74%;
+}
+.tier-iron .tier-emblem-jewel {
+  display: none;
+}
+.tier-iron .tier-emblem-sheen {
+  animation-duration: 12s;
+}
+.tier-bronze {
+  --metal-light: #edc29c;
+  --metal: #b68558;
+  --metal-dark: #735035;
+  --metal-ink: #f7d6af;
+  --enamel-light: #9c7759;
+  --enamel: #624731;
+  --enamel-dark: #34271d;
+  --jewel: #e8ad73;
+}
+.tier-bronze .tier-emblem-frame {
+  width: 72%;
+  height: 78%;
+}
+.tier-bronze .tier-emblem-jewel {
+  width: 7%;
+  height: 7%;
+  left: 46.5%;
+}
+.tier-silver {
+  --metal-light: #f3fbff;
+  --metal: #c5d6e0;
+  --metal-dark: #778e9e;
+  --metal-ink: #f0fbff;
+  --enamel-light: #b3c7d3;
+  --enamel: #657e91;
+  --enamel-dark: #314956;
+  --jewel: #f5feff;
+  --crest: polygon(50% 0, 95% 24%, 95% 68%, 50% 100%, 5% 68%, 5% 24%);
+}
+.tier-silver .tier-emblem-collar {
+  display: block;
+  height: 9%;
+  bottom: 8%;
+}
+.tier-gold {
+  --metal-light: #fff0b1;
+  --metal: #dfb14c;
+  --metal-dark: #95621a;
+  --metal-ink: #ffdf7f;
+  --enamel-light: #d9ad4d;
+  --enamel: #83601e;
+  --enamel-dark: #3f3011;
+  --jewel: #ffedaa;
+}
+.tier-gold .tier-emblem-wings {
+  display: block;
+  inset: 42% 2% 24%;
+  clip-path: polygon(
+    0 0,
+    27% 26%,
+    50% 20%,
+    73% 26%,
+    100% 0,
+    91% 65%,
+    72% 100%,
+    50% 76%,
+    28% 100%,
+    9% 65%
+  );
+}
+.tier-platinum {
+  --metal-light: #e4fff3;
+  --metal: #8cd6bc;
+  --metal-dark: #3e9580;
+  --metal-ink: #cdffe8;
+  --enamel-light: #72bca5;
+  --enamel: #2e7160;
+  --enamel-dark: #153d35;
+  --jewel: #d7fff4;
+  --crest: polygon(50% 0, 98% 27%, 86% 77%, 50% 100%, 14% 77%, 2% 27%);
+}
+.tier-platinum .tier-emblem-wings,
+.tier-platinum .tier-emblem-collar {
+  display: block;
+}
+.tier-platinum .tier-emblem-wings {
+  inset: 27% 0 22%;
+  clip-path: polygon(
+    0 0,
+    32% 24%,
+    50% 18%,
+    68% 24%,
+    100% 0,
+    94% 58%,
+    77% 100%,
+    50% 80%,
+    23% 100%,
+    6% 58%
+  );
+}
+.tier-diamond {
+  --metal-light: #f0fcff;
+  --metal: #9edcf8;
+  --metal-dark: #367dad;
+  --metal-ink: #e4faff;
+  --enamel-light: #67d6f0;
+  --enamel: #2279b4;
+  --enamel-dark: #133e79;
+  --jewel: #c8ffff;
+  --crest: polygon(50% 0, 98% 29%, 81% 78%, 50% 100%, 19% 78%, 2% 29%);
+}
+.tier-diamond .tier-emblem-mantle,
+.tier-diamond .tier-emblem-wings,
+.tier-diamond .tier-emblem-collar {
+  display: block;
+}
+.tier-diamond .tier-emblem-mantle {
+  inset: 0 9%;
+  clip-path: polygon(50% 0, 100% 43%, 50% 100%, 0 43%);
+}
+.tier-diamond .tier-emblem-frame {
+  width: 68%;
+  height: 78%;
+}
+.tier-diamond .tier-emblem-wings {
+  inset: 26% 0 20%;
+  clip-path: polygon(
+    0 0,
+    30% 25%,
+    50% 15%,
+    70% 25%,
+    100% 0,
+    84% 60%,
+    100% 45%,
+    74% 100%,
+    50% 75%,
+    26% 100%,
+    0 45%,
+    16% 60%
+  );
+}
+.tier-master {
+  --metal-light: #f4e5ff;
+  --metal: #c5a6ef;
+  --metal-dark: #7850b0;
+  --metal-ink: #f5eaff;
+  --enamel-light: #c18bf3;
+  --enamel: #8344bf;
+  --enamel-dark: #3a205d;
+  --jewel: #f8d3ff;
+  --aura: #e5aaff;
+  --crest: polygon(50% 0, 95% 25%, 87% 72%, 50% 100%, 13% 72%, 5% 25%);
+}
+.tier-master .tier-emblem-mantle,
+.tier-master .tier-emblem-wings,
+.tier-master .tier-emblem-collar,
+.tier-grandmaster .tier-emblem-mantle,
+.tier-grandmaster .tier-emblem-wings,
+.tier-grandmaster .tier-emblem-collar,
+.tier-king .tier-emblem-mantle,
+.tier-king .tier-emblem-wings,
+.tier-king .tier-emblem-collar {
+  display: block;
+}
+.tier-master .tier-emblem-frame,
+.tier-grandmaster .tier-emblem-frame,
+.tier-king .tier-emblem-frame {
+  width: 62%;
+  height: 75%;
+}
+.tier-master .tier-emblem-wings {
+  inset: 14% 0 16%;
+  clip-path: polygon(
+    0 0,
+    32% 27%,
+    50% 11%,
+    68% 27%,
+    100% 0,
+    88% 35%,
+    98% 28%,
+    83% 57%,
+    94% 48%,
+    77% 83%,
+    50% 100%,
+    23% 83%,
+    6% 48%,
+    17% 57%,
+    2% 28%,
+    12% 35%
+  );
+}
+.tier-master .tier-emblem-mantle {
+  inset: 2% 18% 3%;
+  clip-path: polygon(
+    50% 0,
+    65% 17%,
+    90% 14%,
+    84% 67%,
+    50% 100%,
+    16% 67%,
+    10% 14%,
+    35% 17%
+  );
+}
+.tier-master .tier-emblem-jewel,
+.tier-grandmaster .tier-emblem-jewel,
+.tier-king .tier-emblem-jewel {
+  bottom: 17%;
+  animation: tier-jewel-light 4s ease-in-out infinite;
+  animation-delay: var(--shine-phase, 0s);
+}
+.tier-grandmaster {
+  --metal-light: #ffffff;
+  --metal: #d4e5ef;
+  --metal-dark: #7b8eaa;
+  --metal-ink: #fff3e9;
+  --enamel-light: #ff4b77;
+  --enamel: #c81348;
+  --enamel-dark: #590d35;
+  --jewel: #ff8cac;
+  --aura: #ff376c;
+  --crest: polygon(
+    50% 0,
+    90% 16%,
+    100% 48%,
+    78% 81%,
+    50% 100%,
+    22% 81%,
+    0 48%,
+    10% 16%
+  );
+}
+.tier-grandmaster .tier-emblem-frame {
+  margin-top: 6%;
+  height: 73%;
+}
+.tier-grandmaster .tier-emblem-wings {
+  inset: 12% 0 13%;
+  background:
+    repeating-linear-gradient(
+      150deg,
+      transparent 0 17%,
+      #8196b17a 18% 20%,
+      transparent 21% 27%
+    ),
+    linear-gradient(145deg, #fff, #d7e7f5 42%, #8297b3 64%, #f5faff);
+  clip-path: polygon(
+    0 0,
+    29% 24%,
+    50% 12%,
+    71% 24%,
+    100% 0,
+    92% 31%,
+    100% 23%,
+    85% 53%,
+    96% 43%,
+    77% 77%,
+    67% 93%,
+    50% 100%,
+    33% 93%,
+    23% 77%,
+    4% 43%,
+    15% 53%,
+    0 23%,
+    8% 31%
+  );
+}
+.tier-grandmaster .tier-emblem-mantle {
+  inset: 5% 12% 3%;
+  background: linear-gradient(
+    155deg,
+    #ff90b8,
+    #d51855 45%,
+    #790b3b 72%,
+    #ff628f
+  );
+  clip-path: polygon(
+    50% 0,
+    73% 18%,
+    93% 15%,
+    85% 72%,
+    50% 100%,
+    15% 72%,
+    7% 15%,
+    27% 18%
+  );
+}
+.tier-grandmaster .tier-emblem-coronet {
+  color: #fff6e0;
+}
+.tier-grandmaster .tier-emblem-jewel {
+  box-shadow:
+    -6px 1px 0 -0.5px #fa709d,
+    6px 1px 0 -0.5px #fa709d,
+    0 0 3px #ff8cac;
+}
+.tier-king {
+  --metal-light: #fff8d4;
+  --metal: #f5ce62;
+  --metal-dark: #a57420;
+  --metal-ink: #fff6ce;
+  --enamel-light: #467b9b;
+  --enamel: #173f62;
+  --enamel-dark: #101c36;
+  --jewel: #fff3ae;
+  --aura: #f4cb5e;
+  --crest: polygon(
+    50% 0,
+    85% 14%,
+    100% 44%,
+    86% 75%,
+    50% 100%,
+    14% 75%,
+    0 44%,
+    15% 14%
+  );
+}
+.tier-king .tier-emblem-frame {
+  margin-top: 9%;
+  width: 60%;
+  height: 70%;
+}
+.tier-king .tier-emblem-face {
+  inset: 2px 2px 2.5px;
+}
+.tier-king .tier-emblem-wings {
+  inset: 6% 0 7%;
+  background:
+    repeating-linear-gradient(
+      150deg,
+      transparent 0 12%,
+      #b2842e70 13% 15%,
+      transparent 16% 22%
+    ),
+    linear-gradient(
+      140deg,
+      #fff9e1,
+      #ffe6a1 26%,
+      #d2a543 48%,
+      #f9e7a7 64%,
+      #b88928 80%,
+      #fff0b6
+    );
+  clip-path: polygon(
+    0 0,
+    30% 22%,
+    50% 6%,
+    70% 22%,
+    100% 0,
+    94% 25%,
+    100% 19%,
+    90% 43%,
+    99% 37%,
+    84% 65%,
+    94% 57%,
+    77% 85%,
+    50% 100%,
+    23% 85%,
+    6% 57%,
+    16% 65%,
+    1% 37%,
+    10% 43%,
+    0 19%,
+    6% 25%
+  );
+}
+.tier-king .tier-emblem-mantle {
+  inset: 1% 13% 0;
+  background: linear-gradient(
+    145deg,
+    #fff9db,
+    #e8c575 40%,
+    #fbebae 56%,
+    #9f7a2c
+  );
+  clip-path: polygon(
+    50% 0,
+    63% 16%,
+    81% 5%,
+    86% 44%,
+    100% 71%,
+    71% 88%,
+    50% 100%,
+    29% 88%,
+    0 71%,
+    14% 44%,
+    19% 5%,
+    37% 16%
+  );
+}
+.tier-king .tier-emblem-coronet {
+  top: -1%;
+  left: 23%;
+  width: 54%;
+  height: 31%;
+  color: #fff6c8;
+}
+.tier-king .tier-emblem-coronet svg {
+  fill: #d6a63c;
+}
+.tier-king .tier-emblem-collar {
+  left: 24%;
+  right: 24%;
+  bottom: 8%;
+  height: 21%;
+}
+.tier-king .tier-emblem-jewel {
+  width: 12%;
+  height: 11%;
+  left: 44%;
+  bottom: 14%;
+}
+.tier-master .tier-emblem-aura,
+.tier-grandmaster .tier-emblem-aura,
+.tier-king .tier-emblem-aura {
+  display: block;
+  z-index: -1;
+  inset: 19% 15%;
+  border-radius: 50%;
+  background: var(--aura);
+  opacity: 0.14;
+  filter: blur(4px);
+  animation: tier-aura-light 5s ease-in-out infinite;
+  animation-delay: var(--shine-phase, 0s);
+}
+@keyframes tier-sheen {
+  0%,
+  8% {
+    transform: translateX(-65%);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.75;
+  }
+  28%,
+  100% {
+    transform: translateX(65%);
+    opacity: 0;
+  }
+}
+@keyframes tier-jewel-light {
+  0%,
+  100% {
+    opacity: 0.75;
+    filter: brightness(1);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.25) drop-shadow(0 0 1px var(--jewel));
+  }
+}
+@keyframes tier-aura-light {
+  0%,
+  100% {
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (hover: hover) {
+  .rank-score:hover .tier-emblem-frame,
+  .rank-legend > div:hover .tier-emblem-frame {
+    transform: perspective(100px) rotateY(-10deg) rotateX(7deg)
+      translateY(-0.5px);
+    filter: brightness(1.15);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tier-emblem-frame {
+    transition: none;
+    transform: none !important;
+  }
+  .tier-emblem-sheen,
+  .tier-emblem-jewel,
+  .tier-emblem-aura {
+    animation: none !important;
+  }
+}
+.rank-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 16px 12px;
+  padding: 18px 0 6px;
+}
+.rank-legend > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.rank-legend .tier-emblem {
+  width: 42px;
+  height: 46px;
+  flex-basis: 42px;
+}
+.rank-legend b,
+.rank-legend small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.rank-legend small {
+  color: var(--muted, #69756e);
+  font-size: 11px;
+}

@@ -406,7 +406,7 @@
 }
 .singles-player dl {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(100px, 1.4fr) repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 20px 0;
 }
@@ -433,7 +433,7 @@
 }
 .singles-rating-history button {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 50px 60px;
+  grid-template-columns: minmax(0, 1fr) 78px 38px;
   gap: 12px;
   border-bottom: 1px solid var(--line);
   padding: 12px 0;
@@ -443,6 +443,15 @@
 }
 .singles-rating-history button span {
   overflow-wrap: anywhere;
+}
+.singles-rating-history button {
+  align-items: center;
+}
+.rank-result-scores {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .positive {
   color: #27744d;

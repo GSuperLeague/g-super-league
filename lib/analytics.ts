@@ -1,10 +1,15 @@
 import { score, matchRoles } from "./league.ts";
 import type { League, Match, Player } from "./league.ts";
+import {
+  RATING_BASE,
+  expectedResult,
+  marginMultiplier,
+  mmrChange,
+  nextRankPoints,
+} from "./rating.ts";
 
 export type Role = "overall" | "forward" | "defender";
 export type Result = "W" | "D" | "L";
-export const ELO_BASE = 1200;
-export const ELO_K = 32;
 export const MIN_SAMPLE = 3;
 export type Appearance = {
   match: Match;
@@ -14,12 +19,12 @@ export type Appearance = {
   role?: "forward" | "defender";
   partners: string[];
   opponents: string[];
-  elo?: number;
-  roleElo?: number;
-  eloBefore?: number;
-  roleEloBefore?: number;
-  partnerEloBefore?: number;
-  opponentEloBefore?: number;
+  rankPoints?: number;
+  roleRankPoints?: number;
+  rankBefore?: number;
+  roleRankBefore?: number;
+  partnerRankBefore?: number;
+  opponentRankBefore?: number;
 };
 export type Metrics = {
   games: number;
@@ -47,7 +52,8 @@ export type PlayerStats = {
   overall: Metrics;
   forward: Metrics;
   defender: Metrics;
-  elo: Record<Role, number>;
+  rankPoints: Record<Role, number>;
+  mmr: Record<Role, number>;
   ratedGames: Record<Role, number>;
   recent: Metrics;
   form: Result[];
@@ -157,7 +163,13 @@ export function analyzeLeague(league: League): Analytics {
   const ratings = new Map(
     league.players.map((p) => [
       p.id,
-      { overall: ELO_BASE, forward: ELO_BASE, defender: ELO_BASE },
+      { overall: RATING_BASE, forward: RATING_BASE, defender: RATING_BASE },
+    ]),
+  );
+  const rankPoints = new Map(
+    league.players.map((p) => [
+      p.id,
+      { overall: RATING_BASE, forward: RATING_BASE, defender: RATING_BASE },
     ]),
   );
   const ratedGames = new Map(
@@ -201,14 +213,15 @@ export function analyzeLeague(league: League): Analytics {
       );
     // Rate complete 2v2 results only. Team strength is the mean of both players' pre-match ratings.
     const rated = knownRoles && rosters.every((r) => r.length === 2);
-    const preRatings = new Map(
-      roles.map((id) => [id, { ...ratings.get(id)! }]),
+    const preRankPoints = new Map(
+      roles.map((id) => [id, { ...rankPoints.get(id)! }]),
     );
     const deltas: { id: string; role: Role; value: number }[] = [];
     if (rated) {
       ratedMatches++;
       const homeResult =
         homeScore > awayScore ? 1 : homeScore < awayScore ? 0 : 0.5;
+      const multiplier = marginMultiplier(homeScore, awayScore);
       for (const mode of ["overall", "position"] as const) {
         const before = roles.map(
           (id, i) =>
@@ -220,25 +233,44 @@ export function analyzeLeague(league: League): Analytics {
                   : "defender"
             ],
         );
-        const expected =
-          1 /
-          (1 +
-            10 **
-              (((before[2] + before[3]) / 2 - (before[0] + before[1]) / 2) /
-                400));
-        const delta = ELO_K * (homeResult - expected);
-        roles.forEach((id, i) =>
+        const delta = mmrChange(
+          (before[0] + before[1]) / 2,
+          (before[2] + before[3]) / 2,
+          homeResult,
+          multiplier,
+        );
+        const homeExpected = expectedResult(
+          (before[0] + before[1]) / 2,
+          (before[2] + before[3]) / 2,
+        );
+        roles.forEach((id, i) => {
+          const role =
+            mode === "overall"
+              ? "overall"
+              : i % 2 === 0
+                ? "forward"
+                : "defender";
+          const result =
+            i < 2
+              ? homeResult
+              : homeResult === 1
+                ? 0
+                : homeResult === 0
+                  ? 1
+                  : 0.5;
+          rankPoints.get(id)![role] = nextRankPoints(
+            preRankPoints.get(id)![role],
+            before[i],
+            result,
+            multiplier,
+            i < 2 ? homeExpected : 1 - homeExpected,
+          );
           deltas.push({
             id,
-            role:
-              mode === "overall"
-                ? "overall"
-                : i % 2 === 0
-                  ? "forward"
-                  : "defender",
+            role,
             value: i < 2 ? delta : -delta,
-          }),
-        );
+          });
+        });
       }
       for (const { id, role, value } of deltas) {
         ratings.get(id)![role] += value;
@@ -265,16 +297,17 @@ export function analyzeLeague(league: League): Analytics {
           role,
           partners: roster.filter((pid) => pid !== id),
           opponents: rosters[1 - side],
-          elo: rated ? ratings.get(id)!.overall : undefined,
-          roleElo: rated && role ? ratings.get(id)![role] : undefined,
-          eloBefore: rated ? preRatings.get(id)!.overall : undefined,
-          roleEloBefore: rated && role ? preRatings.get(id)![role] : undefined,
-          partnerEloBefore: rated
-            ? preRatings.get(roster.find((pid) => pid !== id)!)!.overall
+          rankPoints: rated ? rankPoints.get(id)!.overall : undefined,
+          roleRankPoints: rated && role ? rankPoints.get(id)![role] : undefined,
+          rankBefore: rated ? preRankPoints.get(id)!.overall : undefined,
+          roleRankBefore:
+            rated && role ? preRankPoints.get(id)![role] : undefined,
+          partnerRankBefore: rated
+            ? preRankPoints.get(roster.find((pid) => pid !== id)!)!.overall
             : undefined,
-          opponentEloBefore: rated
+          opponentRankBefore: rated
             ? rosters[1 - side].reduce(
-                (sum, pid) => sum + preRatings.get(pid)!.overall,
+                (sum, pid) => sum + preRankPoints.get(pid)!.overall,
                 0,
               ) / 2
             : undefined,
@@ -314,7 +347,8 @@ export function analyzeLeague(league: League): Analytics {
         overall: summarize(history),
         forward: summarize(history.filter((r) => r.role === "forward")),
         defender: summarize(history.filter((r) => r.role === "defender")),
-        elo: ratings.get(player.id)!,
+        rankPoints: rankPoints.get(player.id)!,
+        mmr: ratings.get(player.id)!,
         ratedGames: ratedGames.get(player.id)!,
         recent: summarize(history.slice(-10)),
         form: history.slice(-10).map((r) => r.result),
@@ -339,17 +373,17 @@ export function positionContext(stats: PlayerStats, role: Role) {
   );
   const rated = rows.filter(
     (r) =>
-      r.partnerEloBefore !== undefined && r.opponentEloBefore !== undefined,
+      r.partnerRankBefore !== undefined && r.opponentRankBefore !== undefined,
   );
   return {
     partners: new Set(rows.flatMap((r) => r.partners)).size,
     opponents: new Set(rows.flatMap((r) => r.opponents)).size,
     ratedGames: rated.length,
-    partnerElo: rated.length
-      ? rated.reduce((sum, r) => sum + r.partnerEloBefore!, 0) / rated.length
+    partnerRankPoints: rated.length
+      ? rated.reduce((sum, r) => sum + r.partnerRankBefore!, 0) / rated.length
       : null,
-    opponentElo: rated.length
-      ? rated.reduce((sum, r) => sum + r.opponentEloBefore!, 0) / rated.length
+    opponentRankPoints: rated.length
+      ? rated.reduce((sum, r) => sum + r.opponentRankBefore!, 0) / rated.length
       : null,
   };
 }
@@ -420,9 +454,11 @@ export function matchRatings(
   const rated =
     after !== null && after.ratedMatches === before.ratedMatches + 1;
   const change = (id: string, role: Role): RatingChange => {
-    const start = before.players.find((p) => p.player.id === id)!.elo[role];
+    const start = before.players.find((p) => p.player.id === id)!.rankPoints[
+      role
+    ];
     const end = rated
-      ? after!.players.find((p) => p.player.id === id)!.elo[role]
+      ? after!.players.find((p) => p.player.id === id)!.rankPoints[role]
       : null;
     return {
       before: start,
@@ -539,12 +575,12 @@ export function radarAxes(stats: PlayerStats, role: Role): RadarAxis[] {
     value: stability(m),
     raw: m.deviation === null ? "—" : `σ ${m.deviation.toFixed(2)}`,
   };
-  const elo = {
-    label: role === "forward" ? "前锋 Elo" : "后卫 Elo",
+  const rank = {
+    label: role === "forward" ? "前锋段位分" : "后卫段位分",
     value: stats.ratedGames[role]
-      ? clamp(50 + 50 * Math.tanh((stats.elo[role] - ELO_BASE) / 200))
+      ? clamp(50 + 50 * Math.tanh((stats.rankPoints[role] - RATING_BASE) / 200))
       : null,
-    raw: stats.ratedGames[role] ? Math.round(stats.elo[role]).toString() : "—",
+    raw: stats.ratedGames[role] ? stats.rankPoints[role].toString() : "—",
   };
   if (role === "overall")
     return [
@@ -576,7 +612,7 @@ export function radarAxes(stats: PlayerStats, role: Role): RadarAxis[] {
         raw: numeric(m.avgAgainst),
       },
       net,
-      elo,
+      rank,
       close,
       steady,
     ];
@@ -610,7 +646,7 @@ export function radarAxes(stats: PlayerStats, role: Role): RadarAxis[] {
     },
     net,
     close,
-    elo,
+    rank,
     {
       label: "搭档适配性",
       value: compatibility,

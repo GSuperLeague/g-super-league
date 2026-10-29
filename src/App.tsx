@@ -1,10 +1,10 @@
 import { LiveMatchForm, OwnGoalsPage } from "./LiveMatch";
 import {
-  EloLeaders,
+  RankLeaders,
   PlayerDirectory,
   PlayerProfile,
   AnalyticsPage,
-  MatchElo,
+  MatchRank,
 } from "./Analytics";
 import {
   apiFetch,
@@ -1013,7 +1013,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                       </div>
                     </section>
                   )}
-                  <EloLeaders
+                  <RankLeaders
                     league={s}
                     onPlayer={(id) => {
                       go("players");
@@ -1269,7 +1269,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                   <PageHeading
                     eyebrow="MATCH CENTER"
                     title="好戏，即将开场"
-                    desc="记录比分与位置，自动更新战绩、搭档表现和 Elo。"
+                    desc="记录比分与位置，自动更新战绩、搭档表现和段位分。"
                     button="录入赛后比分"
                     action={() => editResult()}
                   />
@@ -1477,7 +1477,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                               onClick={() =>
                                 confirm(
                                   "确认结束本场比赛？",
-                                  "保留每一粒进球及实际进球人，结算榜单、位置数据和 Elo。需要纠错时，可重新打开比赛。",
+                                  "保留每一粒进球及实际进球人，结算榜单、位置数据和段位分。需要纠错时，可重新打开比赛。",
                                   { type: "match.finish", id: current.id },
                                 )
                               }
@@ -1505,10 +1505,10 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                   </section>
                   <div className="match-scope-note">
                     {current.kind === "pickup"
-                      ? "本场为队伍A / 队伍B临时组队，计入个人表现、搭档数据和 Elo，不计入常驻球队积分榜。"
+                      ? "本场为队伍A / 队伍B临时组队，计入个人表现、搭档数据和段位分，不计入常驻球队积分榜。"
                       : "本场为常驻球队比赛，完赛后计入球队积分榜；赛后结果同时结算个人榜单。"}
                   </div>
-                  <MatchElo
+                  <MatchRank
                     key={current.id}
                     league={s}
                     match={current}
@@ -1570,7 +1570,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                           ))}
                           <p className="help-text">
                             赛后汇总记录球队比分与本场位置；射手榜沿用原版将本队进球计给前锋的口径，不代表真实逐球归属。位置表现、搭档数据与
-                            Elo 按本场结果重新计算。
+                            段位分按本场结果重新计算。
                           </p>
                         </div>
                       ) : current.goals.length ? (
@@ -1799,7 +1799,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                           <li>
                             临时组队自由选择所有已登记球员，固定显示队伍A /
                             队伍B，计个人表现、搭档数据与
-                            Elo，不影响常驻球队积分。
+                            段位分，不影响常驻球队积分。
                           </li>
                           <li>
                             赛后可直接填写最终比分，指定双方固定前锋和后卫，保存即完赛。实时比赛则逐球选择进球人，乌龙球给对方加分，另计乌龙球榜，记错可撤销。
@@ -1808,7 +1808,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                             得失分按球员在场时的球队比分统计，不等同于个人进球。前锋和后卫数据只使用本场明确记录的位置。
                           </li>
                           <li>
-                            球队积分、球员表现、搭档战绩和 Elo
+                            球队积分、球员表现、搭档战绩和段位分
                             随赛果重新计算；其他页面每 3 秒同步。
                           </li>
                           <li>球队积分仅在比赛结束后结算。</li>
@@ -2813,7 +2813,7 @@ function ResultForm({
         })}
         <p>
           {kind === "pickup"
-            ? "本场计入个人表现、搭档数据与 Elo，不计常驻队积分。"
+            ? "本场计入个人表现、搭档数据与段位分，不计常驻队积分。"
             : "本场同时结算球队积分与个人榜单。"}
           球队得分不等于个人进球；各位置表现按本场指定角色统计。
         </p>
