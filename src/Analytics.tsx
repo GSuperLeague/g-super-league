@@ -49,6 +49,8 @@ import type { League, Match, Player } from "../lib/league.ts";
 import { photoUrl } from "./api";
 import { RATING_BASE } from "../lib/rating.ts";
 import { RankLegend, RankScore } from "./RankScore";
+import { doublesRankHistory } from "../lib/rank-history.ts";
+import { RankHistory } from "./RankHistory";
 
 const num = (n: number | null, digits = 2) =>
   n === null ? "—" : n.toFixed(digits);
@@ -433,6 +435,7 @@ export function PlayerProfile({
   onEdit,
   onDelete,
   onPlayer,
+  onMatch,
   matchCard,
 }: {
   league: League;
@@ -441,6 +444,7 @@ export function PlayerProfile({
   onEdit: () => void;
   onDelete: () => void;
   onPlayer: (id: string) => void;
+  onMatch: (id: string) => void;
   matchCard: (match: Match) => ReactNode;
 }) {
   const data = useMemo(() => analyzeLeague(league), [league]);
@@ -504,6 +508,13 @@ export function PlayerProfile({
             sub: `${m.closeGames} 场分差 ≤ 2 球`,
           },
         ]}
+      />
+      <RankHistory
+        key={`${player.id}:${league.seasonId}:${role}`}
+        entries={doublesRankHistory(stats.history, role)}
+        label={`${role === "overall" ? "总" : roleLabels[role]}段位分`}
+        playerName={(id) => league.players.find((p) => p.id === id)?.name || "未知球员"}
+        onMatch={onMatch}
       />
       <div className="data-profile-grid">
         <section className="data-section radar-section">

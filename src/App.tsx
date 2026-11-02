@@ -1304,6 +1304,10 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                   onBack={() => setSelectedPlayer(null)}
                   onPlayer={setSelectedPlayer}
                   onEdit={() => editPlayer(profile)}
+                  onMatch={(id) => {
+                    go("matches");
+                    setSelectedMatch(id);
+                  }}
                   onDelete={() =>
                     confirm(
                       "删除球员档案？",
