@@ -1,4 +1,8 @@
 import type { Goal, League, Player } from "./league.ts";
+import { inheritRating, matchSeason, seasonName } from "./seasons.ts";
+import type { RatingSeed, SeasonContext, SeasonId } from "./seasons.ts";
+import { applyNewsAction } from "./news.ts";
+import type { NewsArticle } from "./news.ts";
 import {
   RATING_BASE,
   expectedResult,
@@ -21,13 +25,14 @@ export type SinglesMatch = {
   goals: Goal[];
   summary?: { homeScore: number; awayScore: number; recordedAt: string };
 };
-export type SinglesLeague = {
+export type SinglesLeague = SeasonContext<RatingSeed> & {
   mode: "singles";
   teams: never[];
   players: SinglesPlayer[];
   matches: SinglesMatch[];
   settings: League["settings"];
   updatedAt: string;
+  news?: NewsArticle[];
 };
 export type SinglesAction = {
   type: string;
@@ -87,7 +92,9 @@ export function applySinglesAction(
   const s = structuredClone(source),
     a = record(input),
     id = str(a.id, 80, true);
-  if (a.type === "player.save") {
+  if (a.type === "news.save" || a.type === "news.delete") {
+    s.news = applyNewsAction(s.news || [], { type: a.type, id, data: a.data });
+  } else if (a.type === "player.save") {
     const p = record(a.data),
       number = int(p.number, 99);
     if (s.players.some((x) => x.id !== id && x.number === number))
@@ -256,8 +263,8 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
         ga: 0,
         gd: 0,
         points: 0,
-        rankPoints: RATING_BASE,
-        mmr: RATING_BASE,
+        rankPoints: s.ratingSeeds?.[player.id]?.rankPoints ?? RATING_BASE,
+        mmr: s.ratingSeeds?.[player.id]?.mmr ?? RATING_BASE,
         winRate: null,
         ownGoals: 0,
         streak: 0,
@@ -327,14 +334,39 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
   }
   return [...stats.values()];
 }
+export function singlesForSeason(
+  league: SinglesLeague,
+  season: SeasonId,
+): SinglesLeague {
+  const beta: SinglesLeague = {
+    ...league,
+    seasonId: "beta",
+    ratingSeeds: undefined,
+    settings: { ...league.settings, season: seasonName("beta") },
+    matches: league.matches.filter((m) => matchSeason(m.time) === "beta"),
+  };
+  if (season === "beta") return beta;
+  return {
+    ...league,
+    seasonId: season,
+    settings: { ...league.settings, season: seasonName(season) },
+    matches: league.matches.filter((m) => matchSeason(m.time) === season),
+    ratingSeeds: Object.fromEntries(
+      analyzeSingles(beta).map((p) => [
+        p.player.id,
+        inheritRating(p.rankPoints, p.mmr),
+      ]),
+    ),
+  };
+}
+
 export function singlesStandings(
   stats: SinglesStats[],
   by: "points" | "rank" = "points",
 ): SinglesStats[] {
   return [...stats].sort((a, b) =>
     by === "rank"
-      ? Number(b.games > 0) - Number(a.games > 0) ||
-        b.rankPoints - a.rankPoints ||
+      ? b.rankPoints - a.rankPoints ||
         b.games - a.games ||
         a.player.id.localeCompare(b.player.id)
       : b.points - a.points ||

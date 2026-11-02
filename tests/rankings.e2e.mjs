@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { chromium } from "playwright";
-import { analyzeLeague, matchRatings } from "../lib/analytics.ts";
+import {
+  analyzeLeague,
+  leagueForSeason,
+  matchRatings,
+} from "../lib/analytics.ts";
 import { rankTier } from "../lib/rating.ts";
 
 const port = process.env.GSL_LOCAL_FRONT_PORT || "5173";
@@ -14,7 +18,8 @@ const base =
 assert.ok(["localhost", "127.0.0.1"].includes(new URL(base).hostname));
 const response = await fetch(new URL("api/league", base));
 assert.equal(response.status, 200);
-const { data: league } = await response.json();
+const { data: rawLeague } = await response.json();
+const league = leagueForSeason(rawLeague, "beta");
 const data = analyzeLeague(league);
 assert.ok(
   data.ratedMatches > 0,
@@ -85,6 +90,9 @@ try {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto(`${base}#doubles`);
     await page.reload();
+    await page
+      .getByRole("combobox", { name: "赛季", exact: true })
+      .selectOption("beta");
     await page
       .getByRole("heading", { name: "个人段位榜", exact: true })
       .waitFor();

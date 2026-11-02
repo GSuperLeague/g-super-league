@@ -1,0 +1,45 @@
+.season-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #52675b;
+}
+.season-picker select {
+  min-width: 108px;
+  border: 1px solid #d8e1db;
+  border-radius: 5px;
+  background: #fff;
+  color: #324e40;
+  padding: 7px 8px;
+  font-size: 12px;
+}
+.season-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #dce4de;
+  padding: 0 0 14px;
+  margin: 0 0 24px;
+  color: #75877b;
+  font-size: 11px;
+}
+.season-context strong {
+  color: #375c47;
+  font-weight: 500;
+}
+@media (max-width: 600px) {
+  .top-actions {
+    gap: 10px;
+  }
+  .season-picker select {
+    min-width: 88px;
+    max-width: 108px;
+    font-size: 11px;
+    padding: 6px 4px;
+  }
+  .season-picker > svg {
+    display: none;
+  }
+}

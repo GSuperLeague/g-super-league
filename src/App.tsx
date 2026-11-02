@@ -6,6 +6,11 @@ import {
   AnalyticsPage,
   MatchRank,
 } from "./Analytics";
+import { leagueForSeason } from "../lib/analytics.ts";
+import { matchSeason } from "../lib/seasons.ts";
+import type { SeasonId } from "../lib/seasons.ts";
+import { SeasonPicker } from "./SeasonPicker";
+import { News } from "./News";
 import {
   apiFetch,
   apiConfigured,
@@ -14,7 +19,14 @@ import {
   clearAdmin,
   loginAdmin,
 } from "./api";
-import { useState, useEffect, useRef, useCallback, ReactNode } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from "react";
 import {
   ArrowUpRight,
   ArrowRight,
@@ -46,6 +58,7 @@ import {
   Undo2,
   Play,
   Target,
+  Newspaper,
 } from "lucide-react";
 import {
   League,
@@ -63,6 +76,7 @@ import {
 } from "@/lib/league";
 type Page =
   | "overview"
+  | "news"
   | "matches"
   | "table"
   | "analytics"
@@ -73,6 +87,7 @@ type Page =
 type Dialog = { kind: string; data?: any };
 const nav = [
   { id: "overview", label: "联赛总览", icon: LayoutDashboard },
+  { id: "news", label: "联赛新闻", icon: Newspaper },
   { id: "matches", label: "赛程与比分", icon: CalendarDays },
   { id: "table", label: "球队积分榜", icon: Trophy },
   { id: "analytics", label: "赛场数据", icon: BarChart3 },
@@ -448,7 +463,7 @@ export function Modal({
   );
 }
 export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
-  const [s, setS] = useState<League>(emptyLeague),
+  const [rawLeague, setS] = useState<League>(emptyLeague),
     [loaded, setLoaded] = useState(false),
     [online, setOnline] = useState(true),
     [page, setPage] = useState<Page>("overview"),
@@ -460,6 +475,11 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
     [matchFilter, setMatchFilter] = useState("all"),
     [selectedMatch, setSelectedMatch] = useState<string | null>(null),
     [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
+  const [season, setSeason] = useState<SeasonId>("s1");
+  const s = useMemo(
+    () => leagueForSeason(rawLeague, season),
+    [rawLeague, season],
+  );
   const [isAdmin, setIsAdmin] = useState(() => Boolean(adminToken())),
     [authOpen, setAuthOpen] = useState(false),
     [authError, setAuthError] = useState("");
@@ -515,6 +535,11 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
       const body: any = await r.json();
       if (!r.ok) throw Error(body.error || "保存失败");
       accept(body);
+      if (
+        (action.type === "match.save" || action.type === "match.result") &&
+        action.data?.time
+      )
+        setSeason(matchSeason(action.data.time));
       if (close) setDialog(null);
       notify("已保存，联赛数据已更新");
       return true;
@@ -707,7 +732,11 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
     const blob = new Blob(
         [
           JSON.stringify(
-            { league: s, exportedAt: new Date().toISOString(), version: 1 },
+            {
+              league: rawLeague,
+              exportedAt: new Date().toISOString(),
+              version: 1,
+            },
             null,
             2,
           ),
@@ -811,10 +840,16 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                   ? "实时同步"
                   : "连接中断"}
             </span>
-            <span className="season-pill">
-              <CalendarDays size={14} />
-              {s.settings.season}
-            </span>
+            <SeasonPicker
+              value={season}
+              onChange={(id) => {
+                setSeason(id);
+                setSelectedMatch(null);
+                setSelectedPlayer(null);
+                setQuery("");
+                setTeamFilter("");
+              }}
+            />
             <button
               className="top-avatar"
               aria-label="联赛设置"
@@ -868,6 +903,35 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                   同步暂时中断，当前显示上次读取的数据。
                   <button onClick={refresh}>重新连接</button>
                 </div>
+              )}
+              {page !== "news" && (
+                <div className="season-context">
+                  <strong>
+                    {s.settings.season}
+                    {season === "beta" ? " · 已收官" : " · 进行中"}
+                  </strong>
+                  <span>
+                    {season === "beta"
+                      ? "截至 2026.11.01"
+                      : "2026.11.02 起 · 超出 1200 的段位分继承 33%"}
+                  </span>
+                </div>
+              )}
+              {page === "news" && (
+                <News
+                  league={rawLeague}
+                  admin={isAdmin}
+                  busy={busy}
+                  onSave={(action) => mutate(action, false)}
+                  onMatch={(id) => {
+                    const match = rawLeague.matches.find((m) => m.id === id);
+                    if (match) {
+                      setSeason(matchSeason(match.time));
+                      go("matches");
+                      setSelectedMatch(id);
+                    }
+                  }}
+                />
               )}
               {page === "overview" && (
                 <>
@@ -967,7 +1031,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                   </div>
                   {(!s.teams.length ||
                     !s.players.length ||
-                    !s.matches.length) && (
+                    !rawLeague.matches.length) && (
                     <section className="onboarding">
                       <div>
                         <span className="eyebrow">LET'S GET STARTED</span>
@@ -1085,7 +1149,19 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                   </div>
                 </>
               )}
-              {page === "ownGoals" && <OwnGoalsPage league={s} onMatch={id=>{go("matches");setSelectedMatch(id)}} onPlayer={id=>{go("players");setSelectedPlayer(id)}} />}
+              {page === "ownGoals" && (
+                <OwnGoalsPage
+                  league={s}
+                  onMatch={(id) => {
+                    go("matches");
+                    setSelectedMatch(id);
+                  }}
+                  onPlayer={(id) => {
+                    go("players");
+                    setSelectedPlayer(id);
+                  }}
+                />
+              )}
               {page === "analytics" && (
                 <AnalyticsPage
                   league={s}
@@ -1409,13 +1485,15 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                       </div>
                     </div>
                     <div className="scoreboard-actions">
-                      {(current.summary || current.status==='scheduled') && <button
-                        className="btn lime"
-                        onClick={() => editResult(current)}
-                      >
-                        <Pencil size={16} />
-                        {current.summary ? "编辑赛后结果" : "改用赛后录分"}
-                      </button>}
+                      {(current.summary || current.status === "scheduled") && (
+                        <button
+                          className="btn lime"
+                          onClick={() => editResult(current)}
+                        >
+                          <Pencil size={16} />
+                          {current.summary ? "编辑赛后结果" : "改用赛后录分"}
+                        </button>
+                      )}
                       {!current.summary &&
                         (current.status === "scheduled" ? (
                           <>
@@ -1665,8 +1743,10 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                                 <b>{p.name}</b>
                                 <span>
                                   {matchRoles(current)
-                                    ? p.id === matchRoles(current)!.homeForwardId ||
-                                      p.id === matchRoles(current)!.awayForwardId
+                                    ? p.id ===
+                                        matchRoles(current)!.homeForwardId ||
+                                      p.id ===
+                                        matchRoles(current)!.awayForwardId
                                       ? "本场前锋"
                                       : "本场后卫"
                                     : p.position}
@@ -1704,7 +1784,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                   <PageHeading
                     eyebrow="LEAGUE SETTINGS"
                     title="你的联赛，你来定义"
-                    desc="设置赛季名称与积分规则，做好每一场比赛的准备。"
+                    desc="设置联赛标签与积分规则。"
                   />
                   <div className="settings-grid">
                     <section className="panel settings-panel">
@@ -1730,13 +1810,13 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                             false,
                           );
                         }}
-                        key={JSON.stringify(s.settings)}
+                        key={JSON.stringify(rawLeague.settings)}
                       >
                         <label>
-                          赛季名称
+                          联赛标签
                           <input
                             name="season"
-                            defaultValue={s.settings.season}
+                            defaultValue={rawLeague.settings.season}
                             maxLength={30}
                             required
                           />
@@ -1761,7 +1841,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                           ))}
                         </div>
                         <p className="help-text">
-                          赛季名称仅为标签，修改不会清空已有比赛。积分相同依次比较净胜球、进球数。
+                          赛季按比赛时间划分；此标签不改变归属。积分相同依次比较净胜球、进球数。
                         </p>
                         <button className="btn primary" disabled={busy}>
                           {busy ? (
@@ -1778,8 +1858,8 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                         <Download size={25} />
                         <h2>导出联赛数据</h2>
                         <p>
-                          导出球队、球员、比赛、进球及积分设置的 JSON
-                          快照。头像以链接保留。
+                          导出球队、球员、全部赛季比赛、进球、新闻及积分设置的
+                          JSON 快照。头像以链接保留。
                         </p>
                         <button className="btn secondary" onClick={exportData}>
                           <Download size={16} />
@@ -1931,8 +2011,11 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
             players={s.players}
             busy={busy}
             onSave={async (data) => {
-              const id=dialog.data?.id||data.matchId;
-              if(await mutate({type:"match.save",id,data})){setPage("matches");setSelectedMatch(id)}
+              const id = dialog.data?.id || data.matchId;
+              if (await mutate({ type: "match.save", id, data })) {
+                setPage("matches");
+                setSelectedMatch(id);
+              }
             }}
           />
         </Modal>
@@ -2585,16 +2668,20 @@ function ResultForm({
     return [f?.id || "", d?.id || ""];
   };
   const [homeForwardId, setHF] = useState(
-      (initial ? matchRoles(initial)?.homeForwardId : undefined) || defaults(home, "home")[0],
+      (initial ? matchRoles(initial)?.homeForwardId : undefined) ||
+        defaults(home, "home")[0],
     ),
     [homeDefenderId, setHD] = useState(
-      (initial ? matchRoles(initial)?.homeDefenderId : undefined) || defaults(home, "home")[1],
+      (initial ? matchRoles(initial)?.homeDefenderId : undefined) ||
+        defaults(home, "home")[1],
     ),
     [awayForwardId, setAF] = useState(
-      (initial ? matchRoles(initial)?.awayForwardId : undefined) || defaults(away, "away")[0],
+      (initial ? matchRoles(initial)?.awayForwardId : undefined) ||
+        defaults(away, "away")[0],
     ),
     [awayDefenderId, setAD] = useState(
-      (initial ? matchRoles(initial)?.awayDefenderId : undefined) || defaults(away, "away")[1],
+      (initial ? matchRoles(initial)?.awayDefenderId : undefined) ||
+        defaults(away, "away")[1],
     );
   const [homeScore, setHS] = useState(initial ? String(score(initial)[0]) : ""),
     [awayScore, setAS] = useState(initial ? String(score(initial)[1]) : ""),

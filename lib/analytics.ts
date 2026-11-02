@@ -1,5 +1,7 @@
 import { score, matchRoles } from "./league.ts";
 import type { League, Match, Player } from "./league.ts";
+import { inheritRating, matchSeason, seasonName } from "./seasons.ts";
+import type { SeasonId } from "./seasons.ts";
 import {
   RATING_BASE,
   expectedResult,
@@ -163,13 +165,22 @@ export function analyzeLeague(league: League): Analytics {
   const ratings = new Map(
     league.players.map((p) => [
       p.id,
-      { overall: RATING_BASE, forward: RATING_BASE, defender: RATING_BASE },
+      {
+        overall: league.ratingSeeds?.[p.id]?.overall.mmr ?? RATING_BASE,
+        forward: league.ratingSeeds?.[p.id]?.forward.mmr ?? RATING_BASE,
+        defender: league.ratingSeeds?.[p.id]?.defender.mmr ?? RATING_BASE,
+      },
     ]),
   );
   const rankPoints = new Map(
     league.players.map((p) => [
       p.id,
-      { overall: RATING_BASE, forward: RATING_BASE, defender: RATING_BASE },
+      {
+        overall: league.ratingSeeds?.[p.id]?.overall.rankPoints ?? RATING_BASE,
+        forward: league.ratingSeeds?.[p.id]?.forward.rankPoints ?? RATING_BASE,
+        defender:
+          league.ratingSeeds?.[p.id]?.defender.rankPoints ?? RATING_BASE,
+      },
     ]),
   );
   const ratedGames = new Map(
@@ -364,6 +375,34 @@ export function analyzeLeague(league: League): Analytics {
       matches: p.rows.map((r) => r.match),
       ...summarize(p.rows),
     })),
+  };
+}
+
+export function leagueForSeason(league: League, season: SeasonId): League {
+  const beta: League = {
+    ...league,
+    seasonId: "beta",
+    ratingSeeds: undefined,
+    settings: { ...league.settings, season: seasonName("beta") },
+    matches: league.matches.filter((m) => matchSeason(m.time) === "beta"),
+  };
+  if (season === "beta") return beta;
+  const previous = analyzeLeague(beta);
+  return {
+    ...league,
+    seasonId: season,
+    settings: { ...league.settings, season: seasonName(season) },
+    matches: league.matches.filter((m) => matchSeason(m.time) === season),
+    ratingSeeds: Object.fromEntries(
+      previous.players.map((p) => [
+        p.player.id,
+        {
+          overall: inheritRating(p.rankPoints.overall, p.mmr.overall),
+          forward: inheritRating(p.rankPoints.forward, p.mmr.forward),
+          defender: inheritRating(p.rankPoints.defender, p.mmr.defender),
+        },
+      ]),
+    ),
   };
 }
 

@@ -84,6 +84,78 @@ const player = (id: string) => ({
     photo: "",
   },
 });
+test("news actions validate content, require authentication, and persist separately in both modes", async () => {
+  const { request } = setup();
+  const data = {
+    title: "赛季新闻",
+    summary: "摘要",
+    body: "正文\n\n第二段",
+    season: "beta",
+    publishedAt: "2026-11-02T00:00:00+08:00",
+  };
+  for (const path of ["/api/league", "/api/singles/league"]) {
+    assert.equal(
+      (await request(path, { type: "news.save", id: "story", data }, false))
+        .status,
+      401,
+    );
+    for (const invalid of [
+      { title: " " },
+      { body: "" },
+      { body: "a".repeat(12001) },
+      { season: "other" },
+      { publishedAt: "bad" },
+    ])
+      assert.equal(
+        (
+          await request(path, {
+            type: "news.save",
+            id: "story",
+            data: { ...data, ...invalid },
+          })
+        ).status,
+        400,
+      );
+    assert.equal(
+      (
+        await request(path, {
+          type: "news.save",
+          id: "story",
+          data: { ...data, title: path },
+        })
+      ).status,
+      200,
+    );
+  }
+  for (const path of ["/api/league", "/api/singles/league"]) {
+    const read = async () =>
+      (
+        (await (await request(path)).json()) as {
+          data: { news: { title: string }[] };
+        }
+      ).data.news;
+    assert.equal((await read())[0].title, path);
+    assert.equal(
+      (
+        await request(path, {
+          type: "news.save",
+          id: "story",
+          data: { ...data, title: "更新" },
+        })
+      ).status,
+      200,
+    );
+    assert.deepEqual(
+      (await read()).map((a) => a.title),
+      ["更新"],
+    );
+    assert.equal(
+      (await request(path, { type: "news.delete", id: "story" })).status,
+      200,
+    );
+    assert.deepEqual(await read(), []);
+  }
+});
 test("singles CRUD and settings never read or mutate the doubles document", async () => {
   const { doubles, singles, request } = setup();
   doubles.document = {

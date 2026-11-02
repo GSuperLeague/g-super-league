@@ -158,7 +158,7 @@ export function RankLeaders({
 }) {
   const data = useMemo(() => analyzeLeague(league), [league]);
   const leaders = data.players
-    .filter((p) => p.ratedGames.overall > 0)
+    .filter((p) => p.ratedGames.overall > 0 || league.seasonId === "s1")
     .sort(byRating)
     .slice(0, 3);
   return (
@@ -186,7 +186,11 @@ export function RankLeaders({
               <strong>
                 <RankScore points={p.rankPoints.overall} />
               </strong>
-              <small>{p.overall.games} 场 · 总段位分</small>
+              <small>
+                {p.overall.games
+                  ? `${p.overall.games} 场 · 总段位分`
+                  : "0 场 · 赛季起始分"}
+              </small>
             </div>
             <ArrowUpRight size={16} />
           </button>
@@ -646,36 +650,40 @@ export function PlayerProfile({
 }
 
 function RankChart({ stats, role }: { stats: PlayerStats; role: Role }) {
-  const values = stats.history
-    .filter((r) =>
-      role === "overall"
-        ? r.rankPoints !== undefined
-        : r.role === role && r.roleRankPoints !== undefined,
-    )
-    .map((r) => (role === "overall" ? r.rankPoints! : r.roleRankPoints!));
-  if (!values.length) return <DataEmpty text="暂无有效计分比赛" />;
-  const series = [RATING_BASE, ...values];
+  const history = stats.history.filter((r) =>
+    role === "overall"
+      ? r.rankPoints !== undefined
+      : r.role === role && r.roleRankPoints !== undefined,
+  );
+  const values = history.map((r) =>
+    role === "overall" ? r.rankPoints! : r.roleRankPoints!,
+  );
+  const start =
+    (role === "overall"
+      ? history[0]?.rankBefore
+      : history[0]?.roleRankBefore) ?? stats.rankPoints[role];
+  const series = [start, ...values];
   const min = Math.min(...series) - 15,
     max = Math.max(...series) + 15;
-  const x = (i: number) => 44 + (i / (series.length - 1)) * 580;
+  const x = (i: number) => 44 + (i / Math.max(1, series.length - 1)) * 580;
   const y = (v: number) => 155 - ((v - min) / (max - min)) * 120;
   return (
     <div className="elo-chart">
       <svg
         viewBox="0 0 660 190"
         role="img"
-        aria-label={`段位分从 ${RATING_BASE} 变化至 ${Math.round(values.at(-1)!)}，共 ${values.length} 场`}
+        aria-label={`段位分从 ${start} 变化至 ${series.at(-1)!}，共 ${values.length} 场`}
       >
         <line
           x1="44"
           x2="624"
-          y1={y(RATING_BASE)}
-          y2={y(RATING_BASE)}
+          y1={y(start)}
+          y2={y(start)}
           stroke="#d7dddf"
           strokeDasharray="4 4"
         />
-        <text x="3" y={y(RATING_BASE) + 4}>
-          {RATING_BASE}
+        <text x="3" y={y(start) + 4}>
+          {start}
         </text>
         <path
           d={series.map((v, i) => `${i ? "L" : "M"}${x(i)},${y(v)}`).join(" ")}
@@ -691,10 +699,11 @@ function RankChart({ stats, role }: { stats: PlayerStats; role: Role }) {
           </circle>
         ))}
         <text x="44" y="181">
-          初始
+          赛季起始
         </text>
         <text x="624" y="181" textAnchor="end">
-          第 {values.length} 场 · {Math.round(values.at(-1)!)}
+          {values.length ? `第 ${values.length} 场` : "尚未出场"} ·{" "}
+          {series.at(-1)!}
         </text>
       </svg>
     </div>
@@ -776,7 +785,7 @@ export function AnalyticsPage({
   >(initialTab);
   const [role, setRole] = useState<Role>("overall");
   const [query, setQuery] = useState("");
-  const [minimum, setMinimum] = useState(1);
+  const [minimum, setMinimum] = useState(0);
   const [sort, setSort] = useState("rank");
   const [scope, setScope] = useState("all");
   const [month, setMonth] = useState("");
@@ -868,7 +877,7 @@ export function AnalyticsPage({
             value={minimum}
             onChange={(e) => setMinimum(Number(e.target.value))}
           >
-            {[1, 3, 5, 10].map((n) => (
+            {[0, 1, 3, 5, 10].map((n) => (
               <option key={n} value={n}>
                 {n} 场
               </option>
@@ -1699,9 +1708,7 @@ function PlayerRanking({
     .sort((a, b) => {
       const value = (p: PlayerStats) =>
         sort === "rank"
-          ? p.ratedGames[role]
-            ? p.rankPoints[role]
-            : -Infinity
+          ? p.rankPoints[role]
           : (p[role][
               sort as "winRate" | "avgDifference" | "avgFor" | "avgAgainst"
             ] ?? -Infinity) * (sort === "avgAgainst" ? -1 : 1);
@@ -2372,7 +2379,16 @@ function Methods() {
             1；最终乘倍率并四舍五入。胜场最低加 0 分，
             负场不会加分；钻石起平局不再固定加分。
             总段位分与位置段位分独立计算。完整记录四个位置的 2 对 2
-            完赛计分；筛选范围改变时从 {RATING_BASE} 重算。
+            完赛计分；筛选范围改变时从本赛季起始分重算。
+          </p>
+        </div>
+        <div>
+          <h3>赛季继承</h3>
+          <p>
+            北京时间 2026 年 11 月 2 日零点前归入 beta赛季，
+            此后归入第一赛季。新赛季段位分为 1200 + 四舍五入（旧分超出 1200
+            的部分 × 33%），低于 1200 回到
+            1200。总分和两个位置分别继承；积分、胜负和进失球从零累计。历史赛果修改后，继承分随之重算。
           </p>
         </div>
         <div>

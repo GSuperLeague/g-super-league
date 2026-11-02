@@ -80,11 +80,28 @@ const run = (args) => {
 };
 run(["d1", "migrations", "apply", "DB", ...localArgs]);
 run(["d1", "migrations", "apply", "DB_SINGLES", ...localArgs]);
-const encoded = JSON.stringify(league).replaceAll("'", "''");
+// D1 limits each SQL statement; assemble larger snapshots in a staging row first.
+const encoded = Array.from(JSON.stringify(league));
+const chunks = [];
+for (let offset = 0; offset < encoded.length; offset += 8000)
+  chunks.push(
+    encoded
+      .slice(offset, offset + 8000)
+      .join("")
+      .replaceAll("'", "''"),
+  );
 const sql = resolve(dir, "snapshot.sql");
 await writeFile(
   sql,
-  `INSERT INTO league (id,data,revision) VALUES ('main','${encoded}',0) ON CONFLICT(id) DO UPDATE SET data=excluded.data, revision=league.revision+1;`,
+  [
+    "INSERT INTO league (id,data,revision) VALUES ('snapshot-import','',0) ON CONFLICT(id) DO UPDATE SET data='';",
+    ...chunks.map(
+      (chunk) =>
+        `UPDATE league SET data=data||'${chunk}' WHERE id='snapshot-import';`,
+    ),
+    "INSERT INTO league (id,data,revision) SELECT 'main',data,0 FROM league WHERE id='snapshot-import' ON CONFLICT(id) DO UPDATE SET data=excluded.data, revision=league.revision+1;",
+    "DELETE FROM league WHERE id='snapshot-import';",
+  ].join("\n"),
 );
 if (snapshotPath)
   run([

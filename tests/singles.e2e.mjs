@@ -220,6 +220,18 @@ try {
   await page.getByRole("heading", { name: a.name, exact: true }).waitFor();
   await page.getByLabel("历史交手对手").selectOption(b.id);
   await capture("desktop-player");
+  const archivedMatch = (await read("singles")).data.matches.find(
+    (m) => matchIds.has(m.id) && m.time.startsWith("2026-10-"),
+  );
+  await page.goto(`${base}#singles/matches/${archivedMatch.id}`);
+  await page.getByRole("heading", { name: "单打比赛", exact: true }).waitFor();
+  await waitFor(
+    async () =>
+      (await page
+        .getByRole("combobox", { name: "赛季", exact: true })
+        .inputValue()) === "beta",
+  );
+  await page.locator(".singles-elo-result").waitFor();
   await page.getByRole("link", { name: "双打", exact: true }).click();
   await page.getByRole("heading", { name: "联赛总览", exact: false }).waitFor();
   assert.equal(await page.getByText(a.name, { exact: true }).count(), 0);
@@ -240,6 +252,7 @@ try {
       `players/${a.id}`,
       `matches/${live.id}`,
       "analytics",
+      "news",
       "settings",
     ]) {
       await page.goto(`${base}#singles/${path}`);

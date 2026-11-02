@@ -22,7 +22,12 @@ import {
   Upload,
   UserRound,
   Users,
+  Newspaper,
 } from "lucide-react";
+import { SeasonPicker } from "./SeasonPicker";
+import { News } from "./News";
+import { matchSeason } from "../lib/seasons.ts";
+import type { SeasonId } from "../lib/seasons.ts";
 import { Modal } from "./App";
 import { RankLegend, RankScore } from "./RankScore";
 import {
@@ -30,6 +35,7 @@ import {
   emptySinglesLeague,
   singlesScore,
   singlesStandings,
+  singlesForSeason,
 } from "../lib/singles";
 import type {
   SinglesAction,
@@ -48,6 +54,7 @@ import {
 
 const navigation = [
   { id: "overview", label: "赛事总览", icon: LayoutDashboard },
+  { id: "news", label: "联赛新闻", icon: Newspaper },
   { id: "matches", label: "赛程与比分", icon: CalendarDays },
   { id: "rankings", label: "个人排行榜", icon: Trophy },
   { id: "players", label: "球员档案", icon: Users },
@@ -232,7 +239,17 @@ export default function Singles({
   try {
     selectedId = decodeURIComponent(route[1] || "");
   } catch {}
-  const [league, setLeague] = useState<SinglesLeague>(emptySinglesLeague);
+  const [rawLeague, setLeague] = useState<SinglesLeague>(emptySinglesLeague);
+  const [season, setSeason] = useState<SeasonId>("s1");
+  const league = useMemo(
+    () => singlesForSeason(rawLeague, season),
+    [rawLeague, season],
+  );
+  useEffect(() => {
+    if (page !== "matches" || !selectedId) return;
+    const match = rawLeague.matches.find((m) => m.id === selectedId);
+    if (match) setSeason(matchSeason(match.time));
+  }, [rawLeague.matches, page, selectedId]);
   const [loaded, setLoaded] = useState(false),
     [error, setError] = useState("");
   const [busy, setBusy] = useState(false),
@@ -306,6 +323,14 @@ export default function Singles({
           body: JSON.stringify(action),
         }),
       );
+      if (
+        (action.type === "match.save" || action.type === "match.result") &&
+        action.data &&
+        typeof action.data === "object" &&
+        "time" in action.data &&
+        typeof action.data.time === "string"
+      )
+        setSeason(matchSeason(action.data.time));
       if (mounted.current) setToast("单打数据已保存");
       return true;
     } catch (e) {
@@ -429,7 +454,11 @@ export default function Singles({
       new Blob(
         [
           JSON.stringify(
-            { mode: "singles", league, exportedAt: new Date().toISOString() },
+            {
+              mode: "singles",
+              league: rawLeague,
+              exportedAt: new Date().toISOString(),
+            },
             null,
             2,
           ),
@@ -480,6 +509,15 @@ export default function Singles({
             <span>{heading}</span>
           </div>
           <div className="top-actions">
+            <SeasonPicker
+              value={season}
+              onChange={(id) => {
+                setSeason(id);
+                setMonth("");
+                setOpponentId("");
+                go(page);
+              }}
+            />
             <span className={`sync ${error ? "offline" : ""}`}>
               <i />
               {error ? "连接中断" : loaded ? "实时同步" : "正在连接"}
@@ -527,31 +565,41 @@ export default function Singles({
                   </button>
                 </div>
               )}
-              <header className="page-heading">
-                <div>
-                  <span className="eyebrow">G SUPER LEAGUE / SINGLES</span>
-                  <h1>
-                    {page === "players" && profile
-                      ? profile.player.name
-                      : page === "matches" && current
-                        ? "单打比赛"
-                        : `单打${heading.replace(/^单打/, "")}`}
-                  </h1>
-                  <p>{league.settings.season}</p>
-                </div>
-                {(page === "overview" || page === "matches") &&
-                  !selectedId &&
-                  matchActions}
-                {page === "players" && !selectedId && admin && (
-                  <button
-                    className="btn primary"
-                    onClick={() => setDialog({ kind: "player" })}
-                  >
-                    <Plus size={16} />
-                    登记球员
-                  </button>
-                )}
-              </header>
+              {page !== "news" && (
+                <header className="page-heading">
+                  <div>
+                    <span className="eyebrow">G SUPER LEAGUE / SINGLES</span>
+                    <h1>
+                      {page === "players" && profile
+                        ? profile.player.name
+                        : page === "matches" && current
+                          ? "单打比赛"
+                          : `单打${heading.replace(/^单打/, "")}`}
+                    </h1>
+                    <p>{league.settings.season}</p>
+                  </div>
+                  {(page === "overview" || page === "matches") &&
+                    !selectedId &&
+                    matchActions}
+                  {page === "players" && !selectedId && admin && (
+                    <button
+                      className="btn primary"
+                      onClick={() => setDialog({ kind: "player" })}
+                    >
+                      <Plus size={16} />
+                      登记球员
+                    </button>
+                  )}
+                </header>
+              )}
+              {page === "news" && (
+                <News
+                  league={rawLeague}
+                  admin={admin}
+                  busy={busy}
+                  onSave={mutate}
+                />
+              )}
               {page === "overview" && (
                 <>
                   <Metrics
@@ -634,7 +682,7 @@ export default function Singles({
                         </button>
                       </div>
                       <Ranking
-                        rows={stats.filter((s) => s.games)}
+                        rows={stats.filter((s) => s.games || season === "s1")}
                         kind="rank"
                         limit={5}
                       />
@@ -741,8 +789,8 @@ export default function Singles({
                   <Ranking rows={filteredStats} kind={ranking} />
                   <p className="singles-caption">
                     {month
-                      ? "当前月份内的赛果从初始 1200 重新计算段位分。"
-                      : "段位分初始 1200，黄金及以下有更高成长收益；钻石及以上基础胜负对称。实际按对手强弱、追赶修正和净胜球倍率结算。"}
+                      ? "当前月份内的赛果从本赛季起始分重新计算段位分。"
+                      : "新赛季以 1200 为底，超出部分继承 33%；战绩与积分从零累计。黄金及以下成长收益更高，钻石及以上基础胜负对称，按对手强弱、追赶修正和净胜球倍率结算。"}
                     积分同分依次比较净胜球、进球数。
                   </p>
                   {ranking === "rank" && <RankLegend />}
@@ -1037,7 +1085,7 @@ export default function Singles({
                     <h2>赛季与积分规则</h2>
                     <form
                       className="entity-form"
-                      key={JSON.stringify(league.settings)}
+                      key={JSON.stringify(rawLeague.settings)}
                       onSubmit={async (e) => {
                         e.preventDefault();
                         const f = new FormData(e.currentTarget);
@@ -1055,12 +1103,12 @@ export default function Singles({
                     >
                       <fieldset disabled={!admin || busy}>
                         <label>
-                          赛季名称
+                          联赛标签
                           <input
                             name="season"
                             required
                             maxLength={30}
-                            defaultValue={league.settings.season}
+                            defaultValue={rawLeague.settings.season}
                           />
                         </label>
                         <div className="form-grid three">
@@ -1091,7 +1139,8 @@ export default function Singles({
                       </fieldset>
                     </form>
                     <p className="singles-caption">
-                      赛季名称仅作标签；修改积分规则会重新计算现有单打比赛。
+                      比赛按北京时间 2026 年 11 月 2 日零点划分
+                      beta赛季与第一赛季；此标签不改变归属。修改积分规则会重新计算单打积分。
                     </p>
                   </section>
                   <section className="singles-section">
@@ -1101,7 +1150,7 @@ export default function Singles({
                       导出单打数据
                     </button>
                     <p className="singles-caption">
-                      包含单打球员、比赛和设置；头像以链接保存。
+                      包含单打球员、全部赛季比赛、新闻和设置；头像以链接保存。
                     </p>
                   </section>
                 </div>
