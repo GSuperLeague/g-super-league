@@ -30,6 +30,8 @@ import { matchSeason } from "../lib/seasons.ts";
 import type { SeasonId } from "../lib/seasons.ts";
 import { Modal } from "./App";
 import { RankLegend, RankScore } from "./RankScore";
+import { singlesRankHistory } from "../lib/rank-history.ts";
+import { RankHistory } from "./RankHistory";
 import {
   analyzeSingles,
   emptySinglesLeague,
@@ -910,7 +912,14 @@ export default function Singles({
                         ],
                       ]}
                     />
-                    <div className="singles-columns">
+                    <RankHistory
+                      key={`${profile.player.id}:${season}`}
+                      entries={singlesRankHistory(profile.history)}
+                      label="单打段位分"
+                      playerName={(id) => player(id)?.name || "未知球员"}
+                      onMatch={(id) => go("matches", id)}
+                    />
+                    <div>
                       <section className="singles-section">
                         <h2>赛场表现</h2>
                         <Metrics
@@ -936,36 +945,6 @@ export default function Singles({
                         {profile.games > 0 && profile.games < 3 && (
                           <p className="singles-caption">小样本 · 不足 3 场</p>
                         )}
-                      </section>
-                      <section className="singles-section">
-                        <h2>段位分变化</h2>
-                        <div className="singles-rating-history">
-                          {profile.history
-                            .slice(-10)
-                            .reverse()
-                            .map((h) => (
-                              <button
-                                key={h.match.id}
-                                onClick={() => go("matches", h.match.id)}
-                              >
-                                <span>
-                                  {dateLabel(h.match.time)} · 对阵{" "}
-                                  {player(h.opponentId)?.name}
-                                </span>
-                                <b>
-                                  <RankScore points={h.after} />
-                                </b>
-                                <span
-                                  className={
-                                    h.delta >= 0 ? "positive" : "negative"
-                                  }
-                                >
-                                  {signed(h.delta)}
-                                </span>
-                              </button>
-                            ))}
-                        </div>
-                        {!profile.games && <Empty>暂无单打比赛记录</Empty>}
                       </section>
                     </div>
                     <section className="singles-section">
