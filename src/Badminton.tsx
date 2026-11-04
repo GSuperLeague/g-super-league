@@ -50,6 +50,8 @@ import { photoUrl } from "./api";
 import { RankScore } from "./RankScore";
 import { ShuttleIcon } from "./GairHome";
 import "./badminton.css";
+import gbLeagueLogo from "./assets/gb-league-logo-640.png";
+import gbLeagueLogoFull from "./assets/gb-league-logo.png";
 
 const empty = emptyBadmintonLeague();
 const when = (time: string) =>
@@ -1027,8 +1029,8 @@ export default function Badminton({ route }: { route: string[] }) {
           <ArrowLeft size={14} /> GAIR 超级联赛
         </a>
         <a className="gb-brand" href="#badminton">
-          <span className="gb-brand-mark">
-            <ShuttleIcon size={37} />
+          <span className="gb-brand-mark gb-brand-logo">
+            <img src={gbLeagueLogo} alt="" width={1254} height={1254} />
           </span>
           <span>
             <b>GB 羽毛球联赛</b>
@@ -1144,7 +1146,7 @@ export default function Badminton({ route }: { route: string[] }) {
               )}
               {page === "overview" && (
                 <>
-                  <section className="gb-hero">
+                  <section className="gb-hero gb-hero-with-logo">
                     <div>
                       <span className="gb-eyebrow">
                         GAIR BADMINTON /{" "}
@@ -1179,37 +1181,20 @@ export default function Badminton({ route }: { route: string[] }) {
                         </button>
                       </div>
                     </div>
-                    <div className="gb-hero-art" aria-hidden="true">
-                      <svg viewBox="0 0 460 280" fill="none">
-                        <g transform="translate(40 60) rotate(-15 190 90)">
-                          <rect
-                            width="370"
-                            height="175"
-                            stroke="currentColor"
-                          />
-                          <path
-                            d="M185 0v175M0 87.5h370M30 0v175M340 0v175M0 54h370M0 121h370"
-                            stroke="currentColor"
-                          />
-                          <ellipse
-                            cx="290"
-                            cy="60"
-                            rx="25"
-                            ry="40"
-                            stroke="currentColor"
-                            strokeWidth="3"
-                          />
-                          <path
-                            d="m280 99-25 66"
-                            stroke="currentColor"
-                            strokeWidth="7"
-                          />
-                        </g>
-                      </svg>
-                      <strong>{league.settings.pointsToWin}</strong>
-                      <span>POINTS. ONE GAME.</span>
-                      <ShuttleIcon size={76} />
-                    </div>
+                    <a
+                      className="gb-hero-art gb-hero-logo"
+                      href={gbLeagueLogoFull}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="查看 GB 联赛 Logo 大图"
+                    >
+                      <img
+                        src={gbLeagueLogo}
+                        alt="GB 羽毛球联赛 Logo：九人彩虹热气球"
+                        width={1254}
+                        height={1254}
+                      />
+                    </a>
                   </section>
                   <section className="gb-stat-grid">
                     <div>

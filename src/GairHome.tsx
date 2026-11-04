@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { apiBase } from "./api";
 import { badmintonApiBase } from "./badminton-api";
+import gbLeagueLogo from "./assets/gb-league-logo-640.png";
 import "./gair.css";
 export function ShuttleIcon({ size = 24 }: { size?: number }) {
   return (
@@ -201,8 +202,8 @@ export default function GairHome() {
           </article>
           <article className="gair-league-card gair-badminton">
             <div className="gair-card-top">
-              <span className="gair-card-icon">
-                <ShuttleIcon size={34} />
+              <span className="gair-card-icon gair-card-logo">
+                <img src={gbLeagueLogo} alt="" width={1254} height={1254} />
               </span>
               <span className="gair-card-badge">NEW SEASON</span>
             </div>
