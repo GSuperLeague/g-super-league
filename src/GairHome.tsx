@@ -199,7 +199,15 @@ export default function GairHome() {
                 <span className="gair-card-caption">战绩 · 球员 · 精彩对决</span>
               </div>
             </div>
-            <CourtArt />
+            <img
+              className="gair-card-background-logo"
+              src={gSuperLeagueLogo}
+              alt=""
+              aria-hidden="true"
+              width={1254}
+              height={1254}
+              decoding="async"
+            />
           </article>
           <article className="gair-league-card gair-badminton">
             <div className="gair-card-top">
@@ -233,7 +241,15 @@ export default function GairHome() {
                 </a>
               </div>
             </div>
-            <CourtArt badminton />
+            <img
+              className="gair-card-background-logo"
+              src={gbLeagueLogo}
+              alt=""
+              aria-hidden="true"
+              width={1254}
+              height={1254}
+              decoding="async"
+            />
           </article>
         </section>
         <section className="gair-values">
