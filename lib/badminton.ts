@@ -10,7 +10,12 @@ export type BadmintonPlayer = {
   sourcePlayerId?: string;
 };
 export type GameScore = { home: number; away: number };
-export type BadmintonFormat = { pointsToWin: number; bestOf: 1 | 3 };
+export type BadmintonFormat = {
+  pointsToWin: number;
+  bestOf: 1 | 3;
+  // Old stored matches omit this field and keep their original first-to rule.
+  winBy?: 1 | 2;
+};
 export type BadmintonPoint = {
   id: string;
   side: "home" | "away";
@@ -31,13 +36,24 @@ export type BadmintonMatch = {
   recording: "points" | "summary";
   createdAt: string;
   updatedAt: string;
+  recordingSource?: {
+    minutesUrl: string;
+    summaryDocumentUrl: string;
+    verbatimDocumentUrl: string;
+    recordingStart: string;
+    recordingOffsetStartSeconds: number;
+    recordingOffsetEndSeconds: number;
+    timePrecision: string;
+    importedAt: string;
+    note?: string;
+  };
 };
 export type BadmintonLeague = {
   sport: "badminton";
   schemaVersion: 1;
   players: BadmintonPlayer[];
   matches: BadmintonMatch[];
-  settings: { season: string; pointsToWin: number; bestOf: 1 | 3 };
+  settings: { season: string } & BadmintonFormat;
   recentActions: string[];
   updatedAt: string;
 };
@@ -52,7 +68,7 @@ export const emptyBadmintonLeague = (): BadmintonLeague => ({
   schemaVersion: 1,
   players: [],
   matches: [],
-  settings: { season: "GB 第一赛季", pointsToWin: 11, bestOf: 1 },
+  settings: { season: "GB 第一赛季", pointsToWin: 11, bestOf: 1, winBy: 2 },
   recentActions: [],
   updatedAt: "",
 });
@@ -87,15 +103,25 @@ function formatFrom(value: unknown): BadmintonFormat {
     pointsToWin = integer(input.pointsToWin, 1, 99);
   const bestOf = integer(input.bestOf, 1, 3);
   if (bestOf !== 1 && bestOf !== 3) fail("请选择一局决胜或三局两胜");
-  return { pointsToWin, bestOf: bestOf as 1 | 3 };
+  const winBy = input.winBy === undefined ? 2 : integer(input.winBy, 1, 2);
+  return { pointsToWin, bestOf: bestOf as 1 | 3, winBy: winBy as 1 | 2 };
+}
+export function badmintonRuleLabel(format: BadmintonFormat): string {
+  return format.winBy === 2
+    ? `${format.pointsToWin - 1}平后净胜两分`
+    : "不加赛";
 }
 export function gameWinner(
   game: GameScore,
   format: BadmintonFormat,
 ): "home" | "away" | null {
-  if (game.home === format.pointsToWin && game.away < format.pointsToWin)
+  const target =
+    format.winBy === 2
+      ? Math.max(format.pointsToWin, Math.min(game.home, game.away) + 2)
+      : format.pointsToWin;
+  if (game.home === target && game.away < target)
     return "home";
-  if (game.away === format.pointsToWin && game.home < format.pointsToWin)
+  if (game.away === target && game.home < target)
     return "away";
   return null;
 }
@@ -131,9 +157,10 @@ function checkedGames(
     fail("请逐局填写比分");
   const games = (value as unknown[]).map((v) => {
     const g = record(v);
+    const max = format.winBy === 2 ? Number.MAX_SAFE_INTEGER : format.pointsToWin;
     return {
-      home: integer(g.home, 0, format.pointsToWin),
-      away: integer(g.away, 0, format.pointsToWin),
+      home: integer(g.home, 0, max),
+      away: integer(g.away, 0, max),
     };
   });
   let homeWins = 0,
@@ -144,7 +171,11 @@ function checkedGames(
       fail("比赛决出胜负后不能再增加一局");
     const winner = gameWinner(g, format);
     if (!winner && (finished || i < games.length - 1))
-      fail("每局须有一方先达到目标分，双方不能同时达到目标分");
+      fail(
+        format.winBy === 2
+          ? "每局须先达到目标分；平分后须首次净胜两分时结束"
+          : "每局须有一方先达到目标分，双方不能同时达到目标分",
+      );
     if (winner === "home") homeWins++;
     if (winner === "away") awayWins++;
   });
@@ -287,6 +318,7 @@ export function applyBadmintonAction(
       recording: finished ? "summary" : "points",
       createdAt: old?.createdAt || now,
       updatedAt: now,
+      ...(old?.recordingSource ? { recordingSource: old.recordingSource } : {}),
     };
     if (old) s.matches[s.matches.indexOf(old)] = match;
     else s.matches.push(match);

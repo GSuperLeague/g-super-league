@@ -7,6 +7,7 @@ import {
   badmintonScore,
   badmintonWinner,
   badmintonPairs,
+  gameWinner,
 } from "../lib/badminton.ts";
 import type {
   BadmintonLeague,
@@ -47,13 +48,14 @@ const result = (
   games: GameScore[] = [{ home: 11, away: 8 }],
 ) => act(s, "match.result", id, { ...details(mode), games });
 
-test("GB defaults are first to 11, one game; new sport has no table-football history", () => {
+test("GB defaults to 11 points, one game, win by two; new sport has no table-football history", () => {
   const s = emptyBadmintonLeague();
   assert.equal(s.sport, "badminton");
   assert.deepEqual(s.settings, {
     season: "GB 第一赛季",
     pointsToWin: 11,
     bestOf: 1,
+    winBy: 2,
   });
   assert.deepEqual(s.matches, []);
 });
@@ -77,18 +79,54 @@ test("single and double rosters require different players and the correct team s
     /重复/,
   );
 });
-test("11:10 wins without deuce; unfinished, tied or overshooting scores cannot be settled", () => {
+test("deuce accepts the first two-point lead and rejects one-point leads and scores past the finish", () => {
   const s = fixture();
   assert.equal(badmintonWinner(result(s).matches[0]), "home");
-  assert.doesNotThrow(() =>
-    result(s, "close", "singles", [{ home: 11, away: 10 }]),
-  );
+  for (const game of [
+    { home: 11, away: 9 },
+    { home: 12, away: 10 },
+    { home: 16, away: 14 },
+    { home: 14, away: 16 },
+  ]) assert.doesNotThrow(() => result(s, "close", "singles", [game]));
   for (const games of [
     [{ home: 10, away: 8 }],
+    [{ home: 11, away: 10 }],
     [{ home: 11, away: 11 }],
-    [{ home: 12, away: 10 }],
+    [{ home: 16, away: 13 }],
+    [{ home: 12, away: 9 }],
   ])
     assert.throws(() => result(s, "bad", "singles", games));
+});
+test("stored matches without a win-by field retain the old 11:10 finish", () => {
+  assert.equal(gameWinner({ home: 11, away: 10 }, { pointsToWin: 11, bestOf: 1 }), "home");
+  assert.equal(gameWinner({ home: 12, away: 11 }, { pointsToWin: 11, bestOf: 1 }), null);
+  const s = act(fixture(), "match.result", "legacy", {
+    ...details(),
+    format: { pointsToWin: 11, bestOf: 1, winBy: 1 },
+    games: [{ home: 11, away: 10 }],
+  });
+  assert.equal(badmintonWinner(s.matches[0]), "home");
+});
+test("live deuce continues at 11:10, can be undone, and settles only after a two-point lead", () => {
+  let s = act(fixture(), "match.save", "m", { ...details(), startNow: true });
+  for (let i = 0; i < 10; i++) {
+    s = act(s, "point.add", "m", { side: "home" });
+    s = act(s, "point.add", "m", { side: "away" });
+  }
+  s = act(s, "point.add", "m", { side: "home" });
+  assert.equal(badmintonWinner(s.matches[0]), null);
+  assert.throws(() => act(s, "match.finish", "m"), /净胜两分/);
+  s = act(s, "point.add", "m", { side: "away" });
+  s = act(s, "point.add", "m", { side: "home" });
+  s = act(s, "point.add", "m", { side: "home" });
+  assert.equal(badmintonWinner(s.matches[0]), "home");
+  assert.throws(() => act(s, "point.add", "m", { side: "away" }), /完赛条件/);
+  s = act(s, "point.undo", "m");
+  assert.equal(badmintonWinner(s.matches[0]), null);
+  assert.deepEqual(s.matches[0].games, [{ home: 12, away: 11 }]);
+  s = act(s, "point.add", "m", { side: "home" });
+  s = act(s, "match.finish", "m");
+  assert.equal(analyzeBadminton(s, "singles").find((p) => p.player.id === "A")!.rankPoints, 1216);
 });
 test("live points can be undone across a game boundary and do not settle before confirmation", () => {
   let s = act(fixture(), "match.save", "m", { ...details(), startNow: true });
