@@ -1,7 +1,16 @@
 import { score, matchRoles } from "./league.ts";
 import type { League, Match, Player } from "./league.ts";
-import { inheritRating, matchSeason, seasonName } from "./seasons.ts";
+import {
+  inheritRating,
+  matchSeason,
+  seasonName,
+  buildFirstWinAwards,
+  firstWinKey,
+  FIRST_WIN_POLICY,
+  SEASON_START,
+} from "./seasons.ts";
 import type { SeasonId } from "./seasons.ts";
+import * as ratingV1 from "./rating-v1.ts";
 import {
   RATING_BASE,
   expectedResult,
@@ -27,6 +36,10 @@ export type Appearance = {
   roleRankBefore?: number;
   partnerRankBefore?: number;
   opponentRankBefore?: number;
+  firstWinBonus?: number;
+  roleFirstWinBonus?: number;
+  baseDelta?: number | null;
+  roleBaseDelta?: number;
 };
 export type Metrics = {
   games: number;
@@ -57,6 +70,7 @@ export type PlayerStats = {
   rankPoints: Record<Role, number>;
   mmr: Record<Role, number>;
   ratedGames: Record<Role, number>;
+  firstWinPoints: Record<Role, number>;
   recent: Metrics;
   form: Result[];
 };
@@ -75,6 +89,8 @@ export type RatingChange = {
   before: number;
   after: number | null;
   delta: number | null;
+  firstWinBonus?: number;
+  baseDelta?: number | null;
 };
 export type MatchRating = {
   playerId: string;
@@ -158,7 +174,57 @@ const chronological = (a: Match, b: Match) =>
   (a.summary?.recordedAt || "").localeCompare(b.summary?.recordedAt || "") ||
   a.id.localeCompare(b.id);
 
+export function doublesFirstWinAwards(league: League): Record<string, number> {
+  if (league.seasonId === "beta") return {};
+  const known = new Set(league.players.map((p) => p.id));
+  const candidates = league.matches
+    .filter((m) => m.status === "finished")
+    .slice()
+    .sort(chronological)
+    .map((match) => {
+      const r = matchRoles(match),
+        [a, b] = score(match);
+      const roles = r
+        ? [r.homeForwardId, r.homeDefenderId, r.awayForwardId, r.awayDefenderId]
+        : [];
+      const valid =
+        roles.length === 4 &&
+        new Set(roles).size === 4 &&
+        match.homePlayers.length === 2 &&
+        match.awayPlayers.length === 2 &&
+        roles.every(
+          (id, i) =>
+            known.has(id) &&
+            (i < 2 ? match.homePlayers : match.awayPlayers).includes(id),
+        );
+      const offset = a > b ? 0 : 2;
+      return {
+        id: match.id,
+        time: match.time,
+        winners:
+          valid && a !== b
+            ? [
+                { playerId: roles[offset], position: "forward" as const },
+                { playerId: roles[offset + 1], position: "defender" as const },
+              ]
+            : [],
+      };
+    });
+  return buildFirstWinAwards(candidates, league.firstWinPolicy);
+}
+
 export function analyzeLeague(league: League): Analytics {
+  const legacy = league.seasonId === "beta";
+  const nextPoints = legacy ? ratingV1.nextRankPoints : nextRankPoints;
+  const expected = legacy ? ratingV1.expectedResult : expectedResult;
+  const margin = legacy ? ratingV1.marginMultiplier : marginMultiplier;
+  const changeMmr = legacy ? ratingV1.mmrChange : mmrChange;
+  const awards = legacy
+    ? {}
+    : (league.firstWinAwards ?? doublesFirstWinAwards(league));
+  const bonusPoints = new Map(
+    league.players.map((p) => [p.id, { overall: 0, forward: 0, defender: 0 }]),
+  );
   const histories = new Map(
     league.players.map((p) => [p.id, [] as Appearance[]]),
   );
@@ -227,12 +293,25 @@ export function analyzeLeague(league: League): Analytics {
     const preRankPoints = new Map(
       roles.map((id) => [id, { ...rankPoints.get(id)! }]),
     );
+    const preDisplayPoints = new Map(
+      roles
+        .filter((id) => rankPoints.has(id))
+        .map((id) => [
+          id,
+          {
+            overall: rankPoints.get(id)!.overall + bonusPoints.get(id)!.overall,
+            forward: rankPoints.get(id)!.forward + bonusPoints.get(id)!.forward,
+            defender:
+              rankPoints.get(id)!.defender + bonusPoints.get(id)!.defender,
+          },
+        ]),
+    );
     const deltas: { id: string; role: Role; value: number }[] = [];
     if (rated) {
       ratedMatches++;
       const homeResult =
         homeScore > awayScore ? 1 : homeScore < awayScore ? 0 : 0.5;
-      const multiplier = marginMultiplier(homeScore, awayScore);
+      const multiplier = margin(homeScore, awayScore);
       for (const mode of ["overall", "position"] as const) {
         const before = roles.map(
           (id, i) =>
@@ -244,13 +323,13 @@ export function analyzeLeague(league: League): Analytics {
                   : "defender"
             ],
         );
-        const delta = mmrChange(
+        const delta = changeMmr(
           (before[0] + before[1]) / 2,
           (before[2] + before[3]) / 2,
           homeResult,
           multiplier,
         );
-        const homeExpected = expectedResult(
+        const homeExpected = expected(
           (before[0] + before[1]) / 2,
           (before[2] + before[3]) / 2,
         );
@@ -269,7 +348,7 @@ export function analyzeLeague(league: League): Analytics {
                 : homeResult === 0
                   ? 1
                   : 0.5;
-          rankPoints.get(id)![role] = nextRankPoints(
+          rankPoints.get(id)![role] = nextPoints(
             preRankPoints.get(id)![role],
             before[i],
             result,
@@ -287,6 +366,12 @@ export function analyzeLeague(league: League): Analytics {
         ratings.get(id)![role] += value;
         ratedGames.get(id)![role]++;
       }
+      roles.forEach((id, i) => {
+        const role = i % 2 === 0 ? "forward" : "defender";
+        const bonus = awards[firstWinKey(match.id, id, role)] || 0;
+        bonusPoints.get(id)!.overall += bonus;
+        bonusPoints.get(id)![role] += bonus;
+      });
     }
     rosters.forEach((roster, side) => {
       const gf = side === 0 ? homeScore : awayScore,
@@ -308,20 +393,40 @@ export function analyzeLeague(league: League): Analytics {
           role,
           partners: roster.filter((pid) => pid !== id),
           opponents: rosters[1 - side],
-          rankPoints: rated ? rankPoints.get(id)!.overall : undefined,
-          roleRankPoints: rated && role ? rankPoints.get(id)![role] : undefined,
-          rankBefore: rated ? preRankPoints.get(id)!.overall : undefined,
+          rankPoints: rated
+            ? rankPoints.get(id)!.overall + bonusPoints.get(id)!.overall
+            : undefined,
+          roleRankPoints:
+            rated && role
+              ? rankPoints.get(id)![role] + bonusPoints.get(id)![role]
+              : undefined,
+          rankBefore: rated ? preDisplayPoints.get(id)!.overall : undefined,
           roleRankBefore:
-            rated && role ? preRankPoints.get(id)![role] : undefined,
+            rated && role ? preDisplayPoints.get(id)![role] : undefined,
           partnerRankBefore: rated
-            ? preRankPoints.get(roster.find((pid) => pid !== id)!)!.overall
+            ? preDisplayPoints.get(roster.find((pid) => pid !== id)!)!.overall
             : undefined,
           opponentRankBefore: rated
             ? rosters[1 - side].reduce(
-                (sum, pid) => sum + preRankPoints.get(pid)!.overall,
+                (sum, pid) => sum + preDisplayPoints.get(pid)!.overall,
                 0,
               ) / 2
             : undefined,
+          firstWinBonus:
+            rated && role
+              ? awards[firstWinKey(match.id, id, role)] || 0
+              : undefined,
+          roleFirstWinBonus:
+            rated && role
+              ? awards[firstWinKey(match.id, id, role)] || 0
+              : undefined,
+          baseDelta: rated
+            ? rankPoints.get(id)!.overall - preRankPoints.get(id)!.overall
+            : undefined,
+          roleBaseDelta:
+            rated && role
+              ? rankPoints.get(id)![role] - preRankPoints.get(id)![role]
+              : undefined,
         });
       }
       if (rated) {
@@ -347,6 +452,12 @@ export function analyzeLeague(league: League): Analytics {
       }
     });
   }
+  const archive = league.seasonArchives?.beta;
+  const frozenFinal =
+    legacy &&
+    archive &&
+    league.matches.length === archive.matches.length &&
+    league.matches.every((m) => archive.matches.some((old) => old.id === m.id));
   return {
     finished,
     ratedMatches,
@@ -358,9 +469,34 @@ export function analyzeLeague(league: League): Analytics {
         overall: summarize(history),
         forward: summarize(history.filter((r) => r.role === "forward")),
         defender: summarize(history.filter((r) => r.role === "defender")),
-        rankPoints: rankPoints.get(player.id)!,
-        mmr: ratings.get(player.id)!,
+        rankPoints:
+          frozenFinal && archive.finalRatings[player.id]
+            ? {
+                overall: archive.finalRatings[player.id].overall.rankPoints,
+                forward: archive.finalRatings[player.id].forward.rankPoints,
+                defender: archive.finalRatings[player.id].defender.rankPoints,
+              }
+            : {
+                overall:
+                  rankPoints.get(player.id)!.overall +
+                  bonusPoints.get(player.id)!.overall,
+                forward:
+                  rankPoints.get(player.id)!.forward +
+                  bonusPoints.get(player.id)!.forward,
+                defender:
+                  rankPoints.get(player.id)!.defender +
+                  bonusPoints.get(player.id)!.defender,
+              },
+        mmr:
+          frozenFinal && archive.finalRatings[player.id]
+            ? {
+                overall: archive.finalRatings[player.id].overall.mmr,
+                forward: archive.finalRatings[player.id].forward.mmr,
+                defender: archive.finalRatings[player.id].defender.mmr,
+              }
+            : ratings.get(player.id)!,
         ratedGames: ratedGames.get(player.id)!,
+        firstWinPoints: bonusPoints.get(player.id)!,
         recent: summarize(history.slice(-10)),
         form: history.slice(-10).map((r) => r.result),
       };
@@ -379,30 +515,108 @@ export function analyzeLeague(league: League): Analytics {
 }
 
 export function leagueForSeason(league: League, season: SeasonId): League {
+  const archive = league.seasonArchives?.beta;
   const beta: League = {
     ...league,
     seasonId: "beta",
     ratingSeeds: undefined,
-    settings: { ...league.settings, season: seasonName("beta") },
-    matches: league.matches.filter((m) => matchSeason(m.time) === "beta"),
+    firstWinAwards: {},
+    settings: {
+      ...(archive?.settings || league.settings),
+      season: seasonName("beta"),
+    },
+    teams: archive?.teams || league.teams,
+    players: archive
+      ? archive.players.map(
+          (p) => league.players.find((current) => current.id === p.id) || p,
+        )
+      : league.players,
+    matches:
+      archive?.matches ||
+      league.matches.filter((m) => matchSeason(m.time) === "beta"),
   };
   if (season === "beta") return beta;
   const previous = analyzeLeague(beta);
-  return {
+  const next: League = {
     ...league,
     seasonId: season,
     settings: { ...league.settings, season: seasonName(season) },
     matches: league.matches.filter((m) => matchSeason(m.time) === season),
-    ratingSeeds: Object.fromEntries(
-      previous.players.map((p) => [
-        p.player.id,
-        {
-          overall: inheritRating(p.rankPoints.overall, p.mmr.overall),
-          forward: inheritRating(p.rankPoints.forward, p.mmr.forward),
-          defender: inheritRating(p.rankPoints.defender, p.mmr.defender),
+    ratingSeeds:
+      archive?.nextSeasonSeeds ||
+      Object.fromEntries(
+        previous.players.map((p) => [
+          p.player.id,
+          {
+            overall: inheritRating(p.rankPoints.overall, p.mmr.overall),
+            forward: inheritRating(p.rankPoints.forward, p.mmr.forward),
+            defender: inheritRating(p.rankPoints.defender, p.mmr.defender),
+          },
+        ]),
+      ),
+  };
+  next.firstWinAwards = doublesFirstWinAwards(next);
+  return next;
+}
+
+export function archiveBetaLeague(
+  league: League,
+  options: { lockedAt: string; sourceRevision: number; sourceCommit: string },
+): League {
+  if (league.seasonArchives?.beta) throw Error("beta赛季已经封存");
+  const beta = leagueForSeason(league, "beta"),
+    stats = analyzeLeague(beta);
+  const finalRatings = Object.fromEntries(
+    stats.players.map((p) => [
+      p.player.id,
+      {
+        overall: { rankPoints: p.rankPoints.overall, mmr: p.mmr.overall },
+        forward: { rankPoints: p.rankPoints.forward, mmr: p.mmr.forward },
+        defender: { rankPoints: p.rankPoints.defender, mmr: p.mmr.defender },
+      },
+    ]),
+  );
+  const nextSeasonSeeds = Object.fromEntries(
+    stats.players.map((p) => [
+      p.player.id,
+      {
+        overall: inheritRating(p.rankPoints.overall, p.mmr.overall),
+        forward: inheritRating(p.rankPoints.forward, p.mmr.forward),
+        defender: inheritRating(p.rankPoints.defender, p.mmr.defender),
+      },
+    ]),
+  );
+  return {
+    ...structuredClone(league),
+    firstWinPolicy: { ...FIRST_WIN_POLICY },
+    seasonArchives: {
+      ...league.seasonArchives,
+      beta: {
+        schemaVersion: 1,
+        seasonId: "beta",
+        ...options,
+        cutoff: SEASON_START,
+        ruleVersion: "gsl-beta-v1",
+        ruleSnapshot: {
+          base: ratingV1.RATING_BASE,
+          mmrK: ratingV1.MMR_K,
+          expectedScale: 400,
+          rankPointCurve: ratingV1.RANK_POINT_CURVE,
+          margin: "1+0.5*abs(home-away)/max(home,away)",
+          alignmentCap: 8,
+          alignmentDivisor: 25,
+          rounding: "symmetric-nearest-integer",
+          firstWinBonus: 0,
+          inheritance: 0.33,
         },
-      ]),
-    ),
+        matches: structuredClone(beta.matches),
+        players: structuredClone(beta.players),
+        teams: structuredClone(beta.teams),
+        settings: structuredClone(beta.settings),
+        finalRatings,
+        nextSeasonSeeds,
+      },
+    },
   };
 }
 
@@ -499,10 +713,23 @@ export function matchRatings(
     const end = rated
       ? after!.players.find((p) => p.player.id === id)!.rankPoints[role]
       : null;
+    const history = after?.players
+      .find((p) => p.player.id === id)
+      ?.history.find((h) => h.match.id === match.id);
+    const bonus =
+      (role === "overall"
+        ? history?.firstWinBonus
+        : history?.roleFirstWinBonus) || 0;
     return {
       before: start,
       after: end,
       delta: end === null ? null : end - start,
+      ...(league.firstWinPolicy && league.seasonId !== "beta"
+        ? {
+            firstWinBonus: bonus,
+            baseDelta: end === null ? null : end - start - bonus,
+          }
+        : {}),
     };
   };
   const players: MatchRating[] = [];

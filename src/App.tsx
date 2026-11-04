@@ -7,7 +7,8 @@ import {
   MatchRank,
 } from "./Analytics";
 import { leagueForSeason } from "../lib/analytics.ts";
-import { matchSeason } from "../lib/seasons.ts";
+import { matchSeason, assertSeasonWritable } from "../lib/seasons.ts";
+import { ScoringNotice } from "./ScoringNotice";
 import type { SeasonId } from "../lib/seasons.ts";
 import { SeasonPicker } from "./SeasonPicker";
 import { News } from "./News";
@@ -527,6 +528,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
     saving.current = true;
     setBusy(true);
     try {
+      assertSeasonWritable(rawLeague, action);
       const r = await apiFetch("/api/league", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -916,6 +918,13 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                       : "2026.11.02 起 · 超出 1200 的段位分继承 33%"}
                   </span>
                 </div>
+              )}
+              {page !== "news" && (
+                <ScoringNotice
+                  season={season}
+                  locked={Boolean(rawLeague.seasonArchives?.beta)}
+                  policy={rawLeague.firstWinPolicy}
+                />
               )}
               {page === "news" && (
                 <News
@@ -1488,7 +1497,14 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                         <span>客队</span>
                       </div>
                     </div>
-                    <div className="scoreboard-actions">
+                    <fieldset
+                      className="scoreboard-actions"
+                      aria-label="比赛记分操作"
+                      disabled={Boolean(
+                        rawLeague.seasonArchives?.beta &&
+                          matchSeason(current.time) === "beta",
+                      )}
+                    >
                       {(current.summary || current.status === "scheduled") && (
                         <button
                           className="btn lime"
@@ -1583,7 +1599,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                             重新打开 / 修正比分
                           </button>
                         ))}
-                    </div>
+                    </fieldset>
                   </section>
                   <div className="match-scope-note">
                     {current.kind === "pickup"
@@ -1769,6 +1785,10 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                     </span>
                     <button
                       className="text-btn danger"
+                      disabled={Boolean(
+                        rawLeague.seasonArchives?.beta &&
+                          matchSeason(current.time) === "beta",
+                      )}
                       onClick={() =>
                         confirm(
                           "永久删除这场比赛？",
