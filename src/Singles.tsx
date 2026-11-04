@@ -33,6 +33,7 @@ import { Modal } from "./App";
 import { RankLegend, RankScore } from "./RankScore";
 import { singlesRankHistory } from "../lib/rank-history.ts";
 import { RankHistory } from "./RankHistory";
+import gSuperLeagueLogo from "./assets/g-super-league-logo-640.png";
 import {
   analyzeSingles,
   emptySinglesLeague,
@@ -480,7 +481,9 @@ export default function Singles({
     <div className="app-shell singles-shell">
       <aside className="sidebar">
         <a className="brand" href="#singles">
-          <span className="brand-g">G</span>
+          <span className="brand-g g-super-brand-logo">
+            <img src={gSuperLeagueLogo} alt="" width={1254} height={1254} />
+          </span>
           <span>
             <b>G超联赛</b>
             <small>TABLE FOOTBALL LEAGUE</small>

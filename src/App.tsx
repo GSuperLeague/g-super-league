@@ -9,6 +9,8 @@ import {
 import { leagueForSeason } from "../lib/analytics.ts";
 import { matchSeason, assertSeasonWritable } from "../lib/seasons.ts";
 import { ScoringNotice } from "./ScoringNotice";
+import gSuperLeagueLogo from "./assets/g-super-league-logo-640.png";
+import gSuperLeagueLogoFull from "./assets/g-super-league-logo.png";
 import type { SeasonId } from "../lib/seasons.ts";
 import { SeasonPicker } from "./SeasonPicker";
 import { News } from "./News";
@@ -247,116 +249,6 @@ function Radar({
         </text>
       ))}
     </svg>
-  );
-}
-function Pitch() {
-  return (
-    <div className="pitch-art" aria-hidden="true">
-      <span className="pitch-word">
-        G SUPER
-        <br />
-        LEAGUE
-      </span>
-      <svg viewBox="0 0 580 360">
-        <defs>
-          <linearGradient id="field" x1="0" x2="1" y1="0" y2="1">
-            <stop stopColor="#3b6553" />
-            <stop offset="1" stopColor="#214336" />
-          </linearGradient>
-          <linearGradient id="rod">
-            <stop stopColor="#d7dfcf" />
-            <stop offset=".5" stopColor="#819988" />
-            <stop offset="1" stopColor="#c2cdbb" />
-          </linearGradient>
-        </defs>
-        <g transform="translate(90 50) rotate(-15 200 125) skewX(12)">
-          <rect x="-12" y="8" width="410" height="265" rx="11" fill="#142d24" />
-          <rect
-            x="-12"
-            y="-7"
-            width="410"
-            height="265"
-            rx="11"
-            fill="#567359"
-          />
-          <rect width="385" height="244" rx="5" fill="url(#field)" />
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <rect
-              key={i}
-              x={i * 64}
-              width="32"
-              height="244"
-              fill="#fff"
-              opacity=".025"
-            />
-          ))}
-          <g stroke="#c6d9a9" strokeWidth="1.5" opacity=".45" fill="none">
-            <rect x="16" y="15" width="354" height="214" />
-            <path d="M193 15v214" />
-            <circle cx="193" cy="122" r="39" />
-            <path d="M16 68h54v108H16M370 68h-54v108h54M16 94h20v55H16M370 94h-20v55h20" />
-          </g>
-          {[42, 119, 265, 343].map((x, i) => (
-            <g key={x}>
-              <rect
-                x={x - 2}
-                y="-32"
-                width="5"
-                height="308"
-                rx="2"
-                fill="url(#rod)"
-              />
-              <rect
-                x={x - 7}
-                y={i < 2 ? 249 : -46}
-                width="15"
-                height="42"
-                rx="4"
-                fill="#13281f"
-              />
-              {(i === 0 || i === 3 ? [122] : [65, 178]).map((y) => (
-                <g key={y}>
-                  <rect
-                    x={x - 10}
-                    y={y + 8}
-                    width="28"
-                    height="10"
-                    rx="3"
-                    fill="#102a1e"
-                    opacity=".35"
-                  />
-                  <rect
-                    x={x - 10}
-                    y={y - 4}
-                    width="20"
-                    height="15"
-                    rx="4"
-                    fill={i < 2 ? "#d2f492" : "#e9e9d5"}
-                  />
-                  <rect
-                    x={x - 6}
-                    y={y + 7}
-                    width="12"
-                    height="17"
-                    rx="3"
-                    fill={i < 2 ? "#a4c962" : "#bcc5b1"}
-                  />
-                  <circle
-                    cx={x}
-                    cy={y - 6}
-                    r="7"
-                    fill={i < 2 ? "#d6f7a0" : "#fffdeb"}
-                  />
-                </g>
-              ))}
-            </g>
-          ))}
-          <circle cx="218" cy="154" r="7" fill="#fff9d6" />
-          <circle cx="220" cy="157" r="7" fill="#11281e" opacity=".15" />
-        </g>
-      </svg>
-      <span className="pitch-coordinate">120 × 70 CM · 无限可能</span>
-    </div>
   );
 }
 function Empty({
@@ -761,8 +653,8 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
           onClick={() => go("overview")}
           aria-label="G超联赛首页"
         >
-          <span className="brand-g">
-            G<span>★</span>
+          <span className="brand-g g-super-brand-logo">
+            <img src={gSuperLeagueLogo} alt="" width={1254} height={1254} />
           </span>
           <span>
             <b>G超联赛</b>
@@ -961,7 +853,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                       录入赛后比分
                     </button>
                   </div>
-                  <section className="hero">
+                  <section className="hero g-super-hero">
                     <div className="hero-copy">
                       <div className="hero-label">
                         <span />
@@ -985,7 +877,20 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                         PASSION. PRECISION. GLORY.
                       </div>
                     </div>
-                    <Pitch />
+                    <a
+                      className="g-super-hero-logo"
+                      href={gSuperLeagueLogoFull}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="查看 G超联赛 Logo 大图"
+                    >
+                      <img
+                        src={gSuperLeagueLogo}
+                        alt="G超桌足联赛 Logo：七人彩虹热气球"
+                        width={1254}
+                        height={1254}
+                      />
+                    </a>
                   </section>
                   <div className="stat-grid">
                     {[
