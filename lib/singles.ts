@@ -1,6 +1,16 @@
 import type { Goal, League, Player } from "./league.ts";
-import { inheritRating, matchSeason, seasonName } from "./seasons.ts";
+import {
+  inheritRating,
+  matchSeason,
+  seasonName,
+  buildFirstWinAwards,
+  firstWinKey,
+  assertSeasonWritable,
+  FIRST_WIN_POLICY,
+  SEASON_START,
+} from "./seasons.ts";
 import type { RatingSeed, SeasonContext, SeasonId } from "./seasons.ts";
+import * as ratingV1 from "./rating-v1.ts";
 import { applyNewsAction } from "./news.ts";
 import type { NewsArticle } from "./news.ts";
 import {
@@ -25,7 +35,12 @@ export type SinglesMatch = {
   goals: Goal[];
   summary?: { homeScore: number; awayScore: number; recordedAt: string };
 };
-export type SinglesLeague = SeasonContext<RatingSeed> & {
+export type SinglesLeague = SeasonContext<
+  RatingSeed,
+  SinglesMatch,
+  SinglesPlayer,
+  never
+> & {
   mode: "singles";
   teams: never[];
   players: SinglesPlayer[];
@@ -92,6 +107,7 @@ export function applySinglesAction(
   const s = structuredClone(source),
     a = record(input),
     id = str(a.id, 80, true);
+  assertSeasonWritable(s, { type: String(a.type), id, data: a.data });
   if (a.type === "news.save" || a.type === "news.delete") {
     s.news = applyNewsAction(s.news || [], { type: a.type, id, data: a.data });
   } else if (a.type === "player.save") {
@@ -230,6 +246,8 @@ export type SinglesAppearance = {
   before: number;
   after: number;
   delta: number;
+  firstWinBonus?: number;
+  baseDelta?: number;
 };
 export type SinglesStats = {
   player: SinglesPlayer;
@@ -242,6 +260,7 @@ export type SinglesStats = {
   gd: number;
   points: number;
   rankPoints: number;
+  firstWinPoints: number;
   mmr: number;
   winRate: number | null;
   ownGoals: number;
@@ -250,6 +269,12 @@ export type SinglesStats = {
   history: SinglesAppearance[];
 };
 export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
+  const legacy = s.seasonId === "beta";
+  const nextPoints = legacy ? ratingV1.nextRankPoints : nextRankPoints;
+  const expected = legacy ? ratingV1.expectedResult : expectedResult;
+  const margin = legacy ? ratingV1.marginMultiplier : marginMultiplier;
+  const changeMmr = legacy ? ratingV1.mmrChange : mmrChange;
+  const awards = legacy ? {} : (s.firstWinAwards ?? singlesFirstWinAwards(s));
   const stats = new Map<string, SinglesStats>(
     s.players.map((player) => [
       player.id,
@@ -264,6 +289,7 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
         gd: 0,
         points: 0,
         rankPoints: s.ratingSeeds?.[player.id]?.rankPoints ?? RATING_BASE,
+        firstWinPoints: 0,
         mmr: s.ratingSeeds?.[player.id]?.mmr ?? RATING_BASE,
         winRate: null,
         ownGoals: 0,
@@ -289,17 +315,18 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
     if (!home || !away || home === away) continue;
     const [a, b] = singlesScore(match),
       actual = a > b ? 1 : a < b ? 0 : 0.5;
-    const multiplier = marginMultiplier(a, b);
-    const delta = mmrChange(home.mmr, away.mmr, actual, multiplier);
-    const homeExpected = expectedResult(home.mmr, away.mmr);
+    const multiplier = margin(a, b);
+    const delta = changeMmr(home.mmr, away.mmr, actual, multiplier);
+    const homeExpected = expected(home.mmr, away.mmr);
     for (const [self, opponent, gf, ga, change] of [
       [home, away, a, b, delta],
       [away, home, b, a, -delta],
     ] as const) {
       const result = gf > ga ? "W" : gf < ga ? "L" : "D";
-      const before = self.rankPoints;
-      self.rankPoints = nextRankPoints(
-        before,
+      const baseBefore = self.rankPoints;
+      const before = baseBefore + self.firstWinPoints;
+      self.rankPoints = nextPoints(
+        baseBefore,
         self.mmr,
         gf > ga ? 1 : gf < ga ? 0 : 0.5,
         multiplier,
@@ -320,6 +347,9 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
       self.mmr += change;
       self.streak = result === "W" ? self.streak + 1 : 0;
       self.bestStreak = Math.max(self.bestStreak, self.streak);
+      const bonus =
+        awards[firstWinKey(match.id, self.player.id, "singles")] || 0;
+      self.firstWinPoints += bonus;
       self.history.push({
         match,
         opponentId: opponent.player.id,
@@ -327,36 +357,147 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
         ga,
         result,
         before,
-        after: self.rankPoints,
-        delta: self.rankPoints - before,
+        after: self.rankPoints + self.firstWinPoints,
+        delta: self.rankPoints + self.firstWinPoints - before,
+        firstWinBonus: bonus,
+        baseDelta: self.rankPoints - baseBefore,
       });
     }
   }
-  return [...stats.values()];
+  const archive = s.seasonArchives?.beta;
+  const frozenFinal =
+    legacy &&
+    archive &&
+    s.matches.length === archive.matches.length &&
+    s.matches.every((m) => archive.matches.some((old) => old.id === m.id));
+  return [...stats.values()].map((p) => ({
+    ...p,
+    rankPoints:
+      frozenFinal && archive.finalRatings[p.player.id]
+        ? archive.finalRatings[p.player.id].rankPoints
+        : p.rankPoints + p.firstWinPoints,
+    mmr:
+      frozenFinal && archive.finalRatings[p.player.id]
+        ? archive.finalRatings[p.player.id].mmr
+        : p.mmr,
+  }));
+}
+export function singlesFirstWinAwards(
+  s: SinglesLeague,
+): Record<string, number> {
+  if (s.seasonId === "beta") return {};
+  const known = new Set(s.players.map((p) => p.id));
+  const candidates = s.matches
+    .filter((m) => m.status === "finished")
+    .slice()
+    .sort(
+      (a, b) =>
+        Date.parse(a.time) - Date.parse(b.time) || a.id.localeCompare(b.id),
+    )
+    .map((m) => {
+      const [a, b] = singlesScore(m),
+        winner = a > b ? m.homeId : m.awayId;
+      const valid =
+        m.homeId !== m.awayId &&
+        known.has(m.homeId) &&
+        known.has(m.awayId) &&
+        a !== b;
+      return {
+        id: m.id,
+        time: m.time,
+        winners: valid
+          ? [{ playerId: winner, position: "singles" as const }]
+          : [],
+      };
+    });
+  return buildFirstWinAwards(candidates, s.firstWinPolicy);
 }
 export function singlesForSeason(
   league: SinglesLeague,
   season: SeasonId,
 ): SinglesLeague {
+  const archive = league.seasonArchives?.beta;
   const beta: SinglesLeague = {
     ...league,
     seasonId: "beta",
     ratingSeeds: undefined,
-    settings: { ...league.settings, season: seasonName("beta") },
-    matches: league.matches.filter((m) => matchSeason(m.time) === "beta"),
+    firstWinAwards: {},
+    settings: {
+      ...(archive?.settings || league.settings),
+      season: seasonName("beta"),
+    },
+    players: archive
+      ? archive.players.map(
+          (p) => league.players.find((current) => current.id === p.id) || p,
+        )
+      : league.players,
+    matches:
+      archive?.matches ||
+      league.matches.filter((m) => matchSeason(m.time) === "beta"),
   };
   if (season === "beta") return beta;
-  return {
+  const next: SinglesLeague = {
     ...league,
     seasonId: season,
     settings: { ...league.settings, season: seasonName(season) },
     matches: league.matches.filter((m) => matchSeason(m.time) === season),
-    ratingSeeds: Object.fromEntries(
-      analyzeSingles(beta).map((p) => [
-        p.player.id,
-        inheritRating(p.rankPoints, p.mmr),
-      ]),
-    ),
+    ratingSeeds:
+      archive?.nextSeasonSeeds ||
+      Object.fromEntries(
+        analyzeSingles(beta).map((p) => [
+          p.player.id,
+          inheritRating(p.rankPoints, p.mmr),
+        ]),
+      ),
+  };
+  next.firstWinAwards = singlesFirstWinAwards(next);
+  return next;
+}
+
+export function archiveBetaSingles(
+  league: SinglesLeague,
+  options: { lockedAt: string; sourceRevision: number; sourceCommit: string },
+): SinglesLeague {
+  if (league.seasonArchives?.beta) throw Error("beta赛季已经封存");
+  const beta = singlesForSeason(league, "beta"),
+    stats = analyzeSingles(beta);
+  const finalRatings = Object.fromEntries(
+    stats.map((p) => [p.player.id, { rankPoints: p.rankPoints, mmr: p.mmr }]),
+  );
+  const nextSeasonSeeds = Object.fromEntries(
+    stats.map((p) => [p.player.id, inheritRating(p.rankPoints, p.mmr)]),
+  );
+  return {
+    ...structuredClone(league),
+    firstWinPolicy: { ...FIRST_WIN_POLICY },
+    seasonArchives: {
+      ...league.seasonArchives,
+      beta: {
+        schemaVersion: 1,
+        seasonId: "beta",
+        ...options,
+        cutoff: SEASON_START,
+        ruleVersion: "gsl-beta-v1",
+        ruleSnapshot: {
+          base: ratingV1.RATING_BASE,
+          mmrK: ratingV1.MMR_K,
+          expectedScale: 400,
+          rankPointCurve: ratingV1.RANK_POINT_CURVE,
+          margin: "1+0.5*abs(home-away)/max(home,away)",
+          alignmentCap: 8,
+          alignmentDivisor: 25,
+          rounding: "symmetric-nearest-integer",
+          firstWinBonus: 0,
+          inheritance: 0.33,
+        },
+        matches: structuredClone(beta.matches),
+        players: structuredClone(beta.players),
+        teams: [],
+        settings: structuredClone(beta.settings),
+        finalRatings,
+        nextSeasonSeeds,
+      },
+    },
   };
 }
 
