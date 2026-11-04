@@ -25,16 +25,18 @@
     "restore": "node scripts/migrate.mjs import"
   },
   "dependencies": {
+    "lucide-react": "1.31.0",
     "react": "19.2.6",
-    "react-dom": "19.2.6",
-    "lucide-react": "1.31.0"
+    "react-dom": "19.2.6"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "4.20260515.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
-    "@cloudflare/workers-types": "4.20260515.1",
+    "esbuild": "0.27.3",
+    "miniflare": "4.20260515.0",
     "playwright": "1.64.0",
     "typescript": "5.9.3",
     "vite": "8.0.13",
