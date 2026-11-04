@@ -49,6 +49,7 @@ import {
 import type { BadmintonSnapshot } from "./badminton-api";
 import { photoUrl } from "./api";
 import { RankScore } from "./RankScore";
+import { LeagueAnnouncements } from "./LeagueAnnouncements";
 import { ShuttleIcon } from "./GairHome";
 import "./badminton.css";
 import gbLeagueLogo from "./assets/gb-league-logo-640.png";
@@ -1199,6 +1200,7 @@ export default function Badminton({ route }: { route: string[] }) {
                       />
                     </a>
                   </section>
+                  <LeagueAnnouncements sport="badminton" />
                   <section className="gb-stat-grid">
                     <div>
                       <span>
@@ -1670,6 +1672,12 @@ export default function Badminton({ route }: { route: string[] }) {
                                         }
                                       >
                                         {signed(h.delta)}
+                                        {h.firstWinBonus > 0 && (
+                                          <small className="gb-first-win-breakdown">
+                                            基础 {signed(h.baseDelta)} · 首胜 +
+                                            {h.firstWinBonus}
+                                          </small>
+                                        )}
                                       </td>
                                     </tr>
                                   ) : null;
@@ -1766,7 +1774,7 @@ export default function Badminton({ route }: { route: string[] }) {
                       <h1>实力，一场场打出来。</h1>
                       <p>
                         {modeName(mode)}独立排名 · 初始1200分 ·
-                        胜负按双方赛前实力结算。
+                        胜负按双方赛前实力结算，另计本项目每日首胜 +10。
                       </p>
                     </div>
                   </div>
@@ -1867,6 +1875,9 @@ export default function Badminton({ route }: { route: string[] }) {
                         <div className="gb-profile-rank">
                           <span>{modeName(mode)}段位分</span>
                           <RankScore points={profile.rankPoints} showTier />
+                          {profile.firstWinPoints > 0 && (
+                            <small>已含首胜奖励 +{profile.firstWinPoints}</small>
+                          )}
                           <small>
                             {profile.games
                               ? `${profile.games} 场比赛 · ${profile.wins} 胜 ${profile.losses} 负`
@@ -1970,6 +1981,12 @@ export default function Badminton({ route }: { route: string[] }) {
                                   <small>
                                     {h.before} → {h.after}
                                   </small>
+                                  {h.firstWinBonus > 0 && (
+                                    <small className="gb-first-win-breakdown">
+                                      基础 {signed(h.baseDelta)} · 首胜 +
+                                      {h.firstWinBonus}
+                                    </small>
+                                  )}
                                 </span>
                                 <ChevronRight size={16} />
                               </button>
@@ -2183,7 +2200,10 @@ export default function Badminton({ route }: { route: string[] }) {
                     </p>
                     <p>
                       Elo 计分：胜方获得、负方扣除 32 ×（实际赛果 −
-                      赛前预期胜率）。单打比较两人段位，双打比较两位搭档的平均段位；同队获得相同变化，四舍五入到整数，最低0分。
+                      赛前预期胜率）。单打比较两人的基础段位，双打比较两位搭档的平均基础段位；基础胜负变化相同，四舍五入到整数，基础段位最低0分。
+                    </p>
+                    <p>
+                      从北京时间2026年11月5日起，单打、双打每日首胜各额外加10分，每天00:00刷新，两个项目分别计算。同队两位球员各自判断首胜资格；奖励单独累加，不参与后续正常胜负加减分的计算。逐场记录会显示基础结算与首胜奖励。
                     </p>
                     <p>
                       战胜更强的对手加分更多。比分只用于判断每局和整场胜负，不因多赢几分额外加成。修改、重新打开或删除历史比赛后，后续段位按比赛时间重新计算。

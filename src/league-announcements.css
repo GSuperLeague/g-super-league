@@ -1,0 +1,126 @@
+.league-announcements {
+  margin: 28px 0;
+  color: #294b37;
+}
+
+.league-announcements > header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.league-announcements > header h2 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.league-announcements > header > span {
+  margin-left: auto;
+  color: #7c8973;
+  font-size: 11px;
+}
+
+.league-announcement-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 18px;
+}
+
+.league-announcement-grid.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.league-announcement-card {
+  min-width: 0;
+  padding: 22px 25px;
+  border: 1px solid #d9e4ce;
+  border-radius: 10px;
+  background: #f9fcf4;
+}
+
+.league-announcement-label {
+  font-size: 10px;
+  color: #78925d;
+}
+
+.league-announcement-card h3 {
+  margin: 11px 0;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.league-announcement-summary {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.9;
+}
+
+.league-announcement-date {
+  margin: 12px 0 0;
+  color: #7b8d6b;
+  font-size: 10px;
+  line-height: 1.9;
+}
+
+.league-announcement-card details {
+  margin-top: 14px;
+  border-top: 1px solid #e1e9d7;
+  padding-top: 13px;
+}
+
+.league-announcement-card summary {
+  width: fit-content;
+  cursor: pointer;
+  color: #52713d;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.league-announcement-card details p {
+  margin: 14px 0 0;
+  color: #657957;
+  font-size: 11px;
+  line-height: 2;
+  overflow-wrap: anywhere;
+}
+
+.gb-first-win-breakdown {
+  display: block;
+  margin-top: 5px;
+  color: #6c8b4d;
+  font-size: 9px;
+  line-height: 1.8;
+  white-space: normal;
+}
+
+.gb-history-change .gb-first-win-breakdown {
+  max-width: 170px;
+}
+
+@media (max-width: 680px) {
+  .league-announcements > header > span {
+    width: 100%;
+    margin-left: 28px;
+    font-size: 10px;
+  }
+
+  .league-announcement-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .league-announcement-card {
+    padding: 20px;
+  }
+
+  .league-announcement-summary {
+    font-size: 12px;
+  }
+
+  .gb-history-change .gb-first-win-breakdown {
+    max-width: 125px;
+  }
+}

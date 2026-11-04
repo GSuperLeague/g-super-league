@@ -1,4 +1,9 @@
 export type BadmintonMode = "singles" | "doubles";
+export const BADMINTON_FIRST_WIN_POLICY = {
+  startsAt: "2026-11-05T00:00:00+08:00",
+  timeZone: "Asia/Shanghai",
+  points: 10,
+} as const;
 export type BadmintonPlayer = {
   id: string;
   name: string;
@@ -378,6 +383,8 @@ export type BadmintonAppearance = {
   before: number;
   after: number;
   delta: number;
+  baseDelta: number;
+  firstWinBonus: number;
   partnerIds: string[];
   opponentIds: string[];
   pointsFor: number;
@@ -386,6 +393,7 @@ export type BadmintonAppearance = {
 export type BadmintonStats = {
   player: BadmintonPlayer;
   rankPoints: number;
+  firstWinPoints: number;
   games: number;
   wins: number;
   losses: number;
@@ -403,6 +411,7 @@ export function analyzeBadminton(
       {
         player,
         rankPoints: 1200,
+        firstWinPoints: 0,
         games: 0,
         wins: 0,
         losses: 0,
@@ -420,6 +429,13 @@ export function analyzeBadminton(
         a.createdAt.localeCompare(b.createdAt) ||
         a.id.localeCompare(b.id),
     );
+  const firstWins = new Set<string>();
+  const dayFormat = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: BADMINTON_FIRST_WIN_POLICY.timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
   for (const match of matches) {
     const winner = badmintonWinner(match),
       score = badmintonScore(match),
@@ -434,7 +450,10 @@ export function analyzeBadminton(
     )
       continue;
     const average = (ids: string[]) =>
-      ids.reduce((sum, id) => sum + stats.get(id)!.rankPoints, 0) / ids.length;
+      ids.reduce((sum, id) => {
+        const p = stats.get(id)!;
+        return sum + p.rankPoints - p.firstWinPoints;
+      }, 0) / ids.length;
     const expected =
       1 /
       (1 +
@@ -442,6 +461,12 @@ export function analyzeBadminton(
           ((average(match.awayPlayers) - average(match.homePlayers)) / 400));
     const raw = 32 * ((winner === "home" ? 1 : 0) - expected);
     const delta = Math.sign(raw) * Math.round(Math.abs(raw));
+    const matchTime = Date.parse(match.time);
+    const bonusDay =
+      Number.isFinite(matchTime) &&
+      matchTime >= Date.parse(BADMINTON_FIRST_WIN_POLICY.startsAt)
+        ? dayFormat.format(new Date(matchTime))
+        : null;
     for (const side of ["home", "away"] as const) {
       const roster = side === "home" ? match.homePlayers : match.awayPlayers,
         opponents = side === "home" ? match.awayPlayers : match.homePlayers;
@@ -449,7 +474,16 @@ export function analyzeBadminton(
         const p = stats.get(id)!,
           before = p.rankPoints,
           change = side === "home" ? delta : -delta;
-        p.rankPoints = Math.max(0, before + change);
+        const baseBefore = before - p.firstWinPoints;
+        const baseAfter = Math.max(0, baseBefore + change);
+        const firstWinKey = JSON.stringify([mode, id, bonusDay]);
+        const firstWinBonus =
+          winner === side && bonusDay !== null && !firstWins.has(firstWinKey)
+            ? BADMINTON_FIRST_WIN_POLICY.points
+            : 0;
+        if (firstWinBonus) firstWins.add(firstWinKey);
+        p.firstWinPoints += firstWinBonus;
+        p.rankPoints = baseAfter + p.firstWinPoints;
         p.games++;
         p.wins += Number(winner === side);
         p.losses += Number(winner !== side);
@@ -463,6 +497,8 @@ export function analyzeBadminton(
           before,
           after: p.rankPoints,
           delta: p.rankPoints - before,
+          baseDelta: baseAfter - baseBefore,
+          firstWinBonus,
           partnerIds: roster.filter((x) => x !== id),
           opponentIds: opponents,
           pointsFor,
