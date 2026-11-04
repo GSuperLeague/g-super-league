@@ -27,6 +27,7 @@ import {
   badmintonPairs,
   badmintonScore,
   badmintonWinner,
+  badmintonRuleLabel,
   emptyBadmintonLeague,
 } from "../lib/badminton.ts";
 import type {
@@ -373,6 +374,7 @@ function MatchForm({
     ),
     [startNow, setStartNow] = useState(true),
     [replace, setReplace] = useState(false);
+  const winBy = match ? (match.format.winBy ?? 1) : (league.settings.winBy ?? 2);
   const count = kind === "singles" ? 1 : 2;
   const roster = (side: "home" | "away") =>
     Array.from({ length: count }, (_, index) => {
@@ -435,7 +437,7 @@ function MatchForm({
         round,
         homePlayers: home.slice(0, count),
         awayPlayers: away.slice(0, count),
-        format: { pointsToWin: points, bestOf },
+        format: { pointsToWin: points, bestOf, winBy },
         games: selected,
         startNow,
         replaceDetailed: replace,
@@ -501,7 +503,8 @@ function MatchForm({
         </label>
       </div>
       <p className="gb-help">
-        先达到目标分的一方赢下该局，不加赛。默认11分、一局决胜。
+        默认11分、一局决胜；
+        {badmintonRuleLabel({ pointsToWin: points, bestOf, winBy })}。
       </p>
       <div className="gb-roster-grid">
         <fieldset>
@@ -527,7 +530,7 @@ function MatchForm({
                     aria-label={`第${index + 1}局A方得分`}
                     type="number"
                     min={0}
-                    max={points}
+                    max={winBy === 2 ? undefined : points}
                     required
                     value={games[index]?.home ?? 0}
                     onChange={(e) =>
@@ -549,7 +552,7 @@ function MatchForm({
                     aria-label={`第${index + 1}局B方得分`}
                     type="number"
                     min={0}
-                    max={points}
+                    max={winBy === 2 ? undefined : points}
                     required
                     value={games[index]?.away ?? 0}
                     onChange={(e) =>
@@ -687,7 +690,7 @@ function SettingsForm({
         void onSave(
           "settings.save",
           "settings",
-          { season, pointsToWin: points, bestOf },
+          { season, pointsToWin: points, bestOf, winBy: 2 },
           true,
         );
       }}
@@ -1440,7 +1443,7 @@ export default function Badminton({ route }: { route: string[] }) {
                       </div>
                       <div className="gb-format-tag">
                         {modeName(selected.mode)} · {formatLabel(selected)} ·
-                        不加赛
+                        {badmintonRuleLabel(selected.format)}
                       </div>
                       <div className="gb-large-versus">
                         <div>
@@ -2138,7 +2141,10 @@ export default function Badminton({ route }: { route: string[] }) {
                         </div>
                         <div>
                           <dt>每局目标</dt>
-                          <dd>先到 {league.settings.pointsToWin} 分，不加赛</dd>
+                          <dd>
+                            {league.settings.pointsToWin}分，
+                            {badmintonRuleLabel({ ...league.settings, winBy: league.settings.winBy ?? 2 })}
+                          </dd>
                         </div>
                         <div>
                           <dt>局数</dt>

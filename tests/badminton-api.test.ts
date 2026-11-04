@@ -190,6 +190,37 @@ test("oversized request bodies are bounded before JSON processing", async () => 
   );
   assert.equal(response.status, 400);
 });
+test("GB runtime persists a 16:14 deuce result and rejects 11:10 and a score beyond the first two-point lead", async () => {
+  let revision = 0;
+  for (const id of ["a", "b", "c", "d"]) {
+    const response = await post("player.save", id, {
+      name: `Deuce ${id}`, nickname: "", bio: "", hand: "unknown",
+    }, revision++);
+    assert.equal(response.status, 200);
+  }
+  const details = {
+    mode: "doubles", time: "2026-11-04T19:00:00+08:00", round: "Deuce test",
+    homePlayers: ["a", "b"], awayPlayers: ["c", "d"],
+    format: { pointsToWin: 11, bestOf: 1, winBy: 2 },
+  };
+  for (const game of [{ home: 11, away: 10 }, { home: 16, away: 13 }]) {
+    const bad = await post("match.result", "m", { ...details, games: [game] }, revision);
+    assert.equal(bad.status, 400);
+  }
+  const good = await post("match.result", "m", {
+    ...details, games: [{ home: 16, away: 14 }],
+  }, revision);
+  assert.equal(good.status, 200);
+  const current = (await (await call("/league")).json()) as {
+    data: { matches: { status: string; format: { winBy: number }; games: { home: number; away: number }[] }[] };
+    revision: number;
+  };
+  assert.equal(current.revision, revision + 1);
+  assert.equal(current.data.matches.length, 1);
+  assert.equal(current.data.matches[0].status, "finished");
+  assert.equal(current.data.matches[0].format.winBy, 2);
+  assert.deepEqual(current.data.matches[0].games, [{ home: 16, away: 14 }]);
+});
 test("real D1 writes modify only badminton storage and leave table-football records and revision intact", async () => {
   await post(
     "player.save",
