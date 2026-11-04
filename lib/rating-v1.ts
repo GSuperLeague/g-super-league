@@ -81,4 +81,3 @@ export function nextRankPoints(
         : adjusted;
   return Math.max(0, points + roundRating(change * multiplier));
 }
-
