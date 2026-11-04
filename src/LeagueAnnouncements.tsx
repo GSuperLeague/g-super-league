@@ -24,7 +24,7 @@ export function LeagueAnnouncements({
             <h3>{article.title}</h3>
             <p className="league-announcement-summary">{article.summary}</p>
             <p className="league-announcement-date">
-              {effectiveDate}起 · 北京时间每日00:00刷新
+              {effectiveDate}起 · 北京时间每日00:00刷新资格
             </p>
             <details>
               <summary>奖励说明与计算示例</summary>
