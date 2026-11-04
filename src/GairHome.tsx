@@ -9,6 +9,7 @@ import {
 import { apiBase } from "./api";
 import { badmintonApiBase } from "./badminton-api";
 import gbLeagueLogo from "./assets/gb-league-logo-640.png";
+import gSuperLeagueLogo from "./assets/g-super-league-logo-640.png";
 import "./gair.css";
 export function ShuttleIcon({ size = 24 }: { size?: number }) {
   return (
@@ -168,8 +169,8 @@ export default function GairHome() {
         <section className="gair-league-grid" aria-label="旗下联赛">
           <article className="gair-league-card gair-football">
             <div className="gair-card-top">
-              <span className="gair-card-icon">
-                G<span>★</span>
+              <span className="gair-card-icon gair-card-g-super-logo">
+                <img src={gSuperLeagueLogo} alt="" width={1254} height={1254} />
               </span>
               <span className="gair-card-badge">
                 <i /> 正在进行

@@ -4,7 +4,9 @@ import Doubles from "./App";
 import Singles from "./Singles";
 import "./gair.css";
 import gbLeagueFavicon from "./assets/gb-league-favicon.png";
+import gSuperLeagueFavicon from "./assets/g-super-league-favicon.png";
 import "./gb-logo.css";
+import "./g-super-logo.css";
 const GairHome = lazy(() => import("./GairHome"));
 const Badminton = lazy(() => import("./Badminton"));
 
@@ -33,8 +35,10 @@ export default function LeagueApp() {
     if (favicon) {
       favicon.href = isBadminton
         ? gbLeagueFavicon
-        : `${import.meta.env.BASE_URL}favicon.svg`;
-      favicon.type = isBadminton ? "image/png" : "image/svg+xml";
+        : isHome
+          ? `${import.meta.env.BASE_URL}favicon.svg`
+          : gSuperLeagueFavicon;
+      favicon.type = isHome ? "image/svg+xml" : "image/png";
     }
   }, [isHome, isBadminton]);
   useEffect(() => {
