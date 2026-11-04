@@ -10,3 +10,8 @@ backend/wrangler.jsonc
 *.tsbuildinfo
 
 node_modules
+.cloudflare/
+.cf/
+badminton-api/node_modules/
+badminton-api/.cloudflare/
+badminton-api/.cf/

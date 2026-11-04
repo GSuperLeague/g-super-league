@@ -1,4 +1,40 @@
-# G超联赛
+# GAIR超级联赛
+
+GAIR超级联赛统一入口，下设 **G超桌足联赛** 与 **GB羽毛球联赛（GAIR Badminton）**。
+
+- 统一首页：`#home`；旧的 `#doubles` 与 `#singles` 链接继续指向桌足。
+- GB双打：`#badminton/doubles`；GB单打：`#badminton/singles`。
+- GB默认 **抢11分、一局决胜、不加赛**，11:10也可完赛。每场可选择目标分和一局 / 三局两胜。
+- 支持登记球员、从G超名单加入、安排赛程、逐分计分与撤销、确认完赛、赛后补录和修正、个人排行榜、双打搭档榜、球员逐场加减分、暂停 / 恢复球员登记、JSON导出。
+- GB单双打分别从1200分开始，用K=32、尺度400的Elo计分；双打按搭档平均分比较，双方按赛前值结算。只有确认完赛才计入排名；历史赛果修正后重放后续段位。桌足成绩不参与GB计算。
+- GB与桌足使用同一D1实例，但GB仅写独立的`badminton_league`表。原桌足Worker、`league`和`photos`保持原有职责。
+- 独立GB API部署目标：`https://gair-badminton-api.jason-brown-20-28-2023.workers.dev/api/badminton/league`。管理员验证通过服务绑定调用现有G超 `/api/auth`，不复制或暴露原管理密钥。
+- 名单导入仅沿用姓名、昵称、头像并保留来源球员ID，不复制比赛、球队、人工能力或段位分。导入后资料分别维护。
+
+### GB开发与部署
+
+`badminton-api`是使用`cf`的新项目（无Wrangler配置）；旧`backend`保留其原有部署方式。需要满足GB子项目`package.json`中的Node版本。
+
+```bash
+npm ci
+npm ci --prefix badminton-api
+npm test
+npm run build
+# 本地隔离预览，管理员密码是脚本中的专用预览密钥
+node --experimental-strip-types scripts/gb-preview.mjs
+# 也可传入本地桌足球员/赛果快照，仅写临时本地数据库
+node --experimental-strip-types scripts/gb-preview.mjs /绝对路径/本地快照.json
+```
+
+GB生产部署：在配置指定的Cloudflare账号下，先执行`badminton-api/migrations/0001_badminton.sql`（仅创建独立表），然后在`badminton-api`目录执行`cf deploy --dry-run`与`cf deploy`。明确绑定已有D1数据库与`g-super-league-api`服务；不创建、重置或迁移桌足库。`GB_DATABASE_ID`和`CLOUDFLARE_ACCOUNT_ID`可以覆盖默认绑定。
+
+API提供`GET /api/badminton/league`、`POST /api/badminton/league`、`POST /api/badminton/auth`、`GET /api/badminton/source-players`。写入必须带现有管理员Bearer、`expectedRevision`与唯一`actionId`；冲突返回409，重试同一actionId不重复加分。公开GET不初始化或改写数据。CORS只允许配置来源；请求体最大32KB。
+
+GitHub Pages构建使用`VITE_BADMINTON_API_BASE_URL`（有默认GB服务地址），新增联赛不改变`VITE_API_BASE_URL`。GB API需先完成部署再发布前端。
+
+以下为桌足联赛原有功能与部署说明。
+
+## G超桌足联赛
 
 桌面足球联赛管理网站，从原 Sites 项目迁移为独立 Git 仓库。支持单打、双打两个独立板块。
 

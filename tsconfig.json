@@ -31,6 +31,7 @@
     "src",
     "lib",
     "backend/src",
+    "badminton-api/src",
     "vite.config.ts",
     "tests"
   ]
