@@ -3,6 +3,8 @@ import { ArrowLeft, ArrowUpRight, UserRound, Users } from "lucide-react";
 import Doubles from "./App";
 import Singles from "./Singles";
 import "./gair.css";
+import gbLeagueFavicon from "./assets/gb-league-favicon.png";
+import "./gb-logo.css";
 const GairHome = lazy(() => import("./GairHome"));
 const Badminton = lazy(() => import("./Badminton"));
 
@@ -27,6 +29,13 @@ export default function LeagueApp() {
       : isBadminton
         ? "GB羽毛球联赛 · GAIR超级联赛"
         : "G超桌足联赛 · GAIR超级联赛";
+    const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (favicon) {
+      favicon.href = isBadminton
+        ? gbLeagueFavicon
+        : `${import.meta.env.BASE_URL}favicon.svg`;
+      favicon.type = isBadminton ? "image/png" : "image/svg+xml";
+    }
   }, [isHome, isBadminton]);
   useEffect(() => {
     if (isHome || isBadminton) return;

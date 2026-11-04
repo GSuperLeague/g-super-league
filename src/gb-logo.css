@@ -1,0 +1,89 @@
+.gb-brand-mark.gb-brand-logo {
+  width: 62px;
+  height: 64px;
+  flex: 0 0 62px;
+  background: transparent;
+  border-radius: 0;
+  transform: none;
+}
+
+.gb-brand-logo img,
+.gair-card-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.gb-brand-logo + span {
+  min-width: 0;
+}
+
+.gb-brand-logo + span b {
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.gb-hero-art.gb-hero-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.gb-hero-logo img {
+  display: block;
+  width: min(100%, 290px);
+  height: auto;
+  object-fit: contain;
+}
+
+.gair-badminton .gair-card-icon.gair-card-logo {
+  background: transparent;
+  border-radius: 0;
+}
+
+@media (max-width: 850px) {
+  .gb-brand-logo + span b {
+    font-size: 14px;
+  }
+
+  .gb-brand-mark.gb-brand-logo {
+    width: 56px;
+    height: 58px;
+    flex-basis: 56px;
+  }
+}
+
+@media (max-width: 680px) {
+  .gb-hero.gb-hero-with-logo {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+    min-height: 0;
+  }
+
+  .gb-hero.gb-hero-with-logo > div:first-child {
+    grid-column: auto;
+  }
+
+  .gb-hero-art.gb-hero-logo {
+    position: static;
+    inset: auto;
+    width: 100%;
+    min-height: 0;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .gb-hero-logo img {
+    width: min(100%, 240px);
+  }
+}
+
+@media (max-width: 360px) {
+  .gb-brand-mark.gb-brand-logo {
+    width: 46px;
+    height: 48px;
+    flex-basis: 46px;
+  }
+}
