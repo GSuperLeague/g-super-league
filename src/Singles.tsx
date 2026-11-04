@@ -26,7 +26,8 @@ import {
 } from "lucide-react";
 import { SeasonPicker } from "./SeasonPicker";
 import { News } from "./News";
-import { matchSeason } from "../lib/seasons.ts";
+import { matchSeason, assertSeasonWritable } from "../lib/seasons.ts";
+import { ScoringNotice } from "./ScoringNotice";
 import type { SeasonId } from "../lib/seasons.ts";
 import { Modal } from "./App";
 import { RankLegend, RankScore } from "./RankScore";
@@ -318,6 +319,7 @@ export default function Singles({
     saving.current = true;
     setBusy(true);
     try {
+      assertSeasonWritable(rawLeague, action);
       accept(
         await singlesRequest<LeagueResponse>("/league", {
           method: "POST",
@@ -594,6 +596,14 @@ export default function Singles({
                   )}
                 </header>
               )}
+              {page !== "news" && (
+                <ScoringNotice
+                  season={season}
+                  locked={Boolean(rawLeague.seasonArchives?.beta)}
+                  policy={rawLeague.firstWinPolicy}
+                  singles
+                />
+              )}
               {page === "news" && (
                 <News
                   league={rawLeague}
@@ -762,7 +772,10 @@ export default function Singles({
                     match={current}
                     league={league}
                     stats={stats}
-                    admin={admin}
+                    admin={
+                      admin &&
+                      !(season === "beta" && rawLeague.seasonArchives?.beta)
+                    }
                     busy={busy}
                     mutate={mutate}
                     onEdit={(kind) => setDialog({ kind, match: current })}
@@ -1728,6 +1741,15 @@ function MatchDetail({
                     </span>
                     <b className={h.delta >= 0 ? "positive" : "negative"}>
                       {signed(h.delta)}
+                      {(h.firstWinBonus || 0) > 0 && (
+                        <small className="first-win-breakdown">
+                          基础{" "}
+                          {signed(
+                            h.baseDelta ?? h.delta - (h.firstWinBonus || 0),
+                          )}{" "}
+                          · 每日首胜 +{h.firstWinBonus}
+                        </small>
+                      )}
                     </b>
                   </div>
                 )

@@ -513,7 +513,9 @@ export function PlayerProfile({
         key={`${player.id}:${league.seasonId}:${role}`}
         entries={doublesRankHistory(stats.history, role)}
         label={`${role === "overall" ? "总" : roleLabels[role]}段位分`}
-        playerName={(id) => league.players.find((p) => p.id === id)?.name || "未知球员"}
+        playerName={(id) =>
+          league.players.find((p) => p.id === id)?.name || "未知球员"
+        }
         onMatch={onMatch}
       />
       <div className="data-profile-grid">
@@ -1247,6 +1249,13 @@ export function MatchRank({
                             className={`elo-number ${rating?.delta ? (rating.delta > 0 ? "positive" : "negative") : ""}`}
                           >
                             {rating ? signed(rating.delta, 0) : "—"}
+                            {(rating?.firstWinBonus || 0) > 0 && (
+                              <small className="first-win-breakdown">
+                                基础 {signed(rating?.baseDelta ?? null, 0)} ·{" "}
+                                {row.role === "forward" ? "前锋" : "后卫"}首胜 +
+                                {rating?.firstWinBonus}
+                              </small>
+                            )}
                           </td>
                         </tr>
                       );
@@ -2383,14 +2392,14 @@ function Methods() {
           <h3>段位分</h3>
           <p>
             初始 {RATING_BASE} 分，最低 0
-            分，无定级赛。基础收益随赛前段位分平滑变化：1200 分胜 +32、负
-            −14，1300 分胜 +28、负 −18；1400 分起统一胜 +24、负
+            分，无定级赛。基础收益随赛前基础分（不含首胜奖励）平滑变化：1200
+            分胜 +32、负 −14，1300 分胜 +28、负 −18；1400 分起统一胜 +24、负
             −24，大师、宗师、王者不再额外增加扣分。战胜强队收益更高，负于弱队扣分更多；个人另有最多
             ±8 分的追赶修正。净胜球倍率为 1 + 0.5 × 分差 ÷ 胜方得分，0:0 时取
             1；最终乘倍率并四舍五入。胜场最低加 0 分，
             负场不会加分；钻石起平局不再固定加分。
             总段位分与位置段位分独立计算。完整记录四个位置的 2 对 2
-            完赛计分；筛选范围改变时从本赛季起始分重算。
+            完赛计分；筛选范围改变时从本赛季起始分重算。第一赛季每日前锋首胜、后卫首胜各额外加10分，总分每日最多加20；对应位置各加10。奖励独立叠加，不参与基础结算、净胜球倍率或实力估计。首胜资格按完整赛季与北京时间确定，切换筛选不会重新领取。
           </p>
         </div>
         <div>
@@ -2399,7 +2408,7 @@ function Methods() {
             北京时间 2026 年 11 月 2 日零点前归入 beta赛季，
             此后归入第一赛季。新赛季段位分为 1200 + 四舍五入（旧分超出 1200
             的部分 × 33%），低于 1200 回到
-            1200。总分和两个位置分别继承；积分、胜负和进失球从零累计。历史赛果修改后，继承分随之重算。
+            1200。总分和两个位置分别继承；积分、胜负和进失球从零累计。beta封存后沿用终榜快照及固定继承分；第一赛季的首胜奖励不影响beta。
           </p>
         </div>
         <div>
