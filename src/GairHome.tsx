@@ -10,6 +10,7 @@ import { apiBase } from "./api";
 import { badmintonApiBase } from "./badminton-api";
 import gbLeagueLogo from "./assets/gb-league-logo-640.png";
 import gSuperLeagueLogo from "./assets/g-super-league-logo-640.png";
+import { LeagueAnnouncements } from "./LeagueAnnouncements";
 import "./gair.css";
 export function ShuttleIcon({ size = 24 }: { size?: number }) {
   return (
@@ -159,6 +160,7 @@ export default function GairHome() {
             <span className="gair-visual-caption">小小球场，大大热爱。</span>
           </div>
         </section>
+        <LeagueAnnouncements />
         <div className="gair-section-heading">
           <div>
             <span className="gair-eyebrow">CHOOSE YOUR GAME</span>

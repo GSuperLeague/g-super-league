@@ -19,7 +19,8 @@ import type { League } from "../lib/league.ts";
 import type { SinglesLeague } from "../lib/singles.ts";
 import type { NewsArticle } from "../lib/news.ts";
 import { betaReport } from "../lib/season-news.ts";
-import { SEASONS, seasonName } from "../lib/seasons.ts";
+import { footballFirstWinArticle } from "../lib/rule-announcements.ts";
+import { FIRST_WIN_POLICY, SEASONS, seasonName } from "../lib/seasons.ts";
 import "./news.css";
 
 const dateLabel = (time: string) =>
@@ -56,13 +57,15 @@ export function News({
   const articles = useMemo(() => {
     const result = new Map<string, NewsArticle>();
     if (report) result.set(report.article.id, report.article);
+    if (league.firstWinPolicy?.version === FIRST_WIN_POLICY.version)
+      result.set(footballFirstWinArticle.id, footballFirstWinArticle);
     for (const article of league.news || []) result.set(article.id, article);
     return [...result.values()].sort(
       (a, b) =>
         Date.parse(b.publishedAt) - Date.parse(a.publishedAt) ||
         a.id.localeCompare(b.id),
     );
-  }, [league.news, report]);
+  }, [league.news, league.firstWinPolicy, report]);
   const [selected, setSelected] = useState("");
   const [query, setQuery] = useState("");
   const [season, setSeason] = useState("all");
@@ -96,6 +99,14 @@ export function News({
   const saved = Boolean(
     article && league.news?.some((a) => a.id === article.id),
   );
+  const restoreLabel = !article
+    ? ""
+    : article.id === report?.article.id
+      ? "恢复自动定榜稿"
+      : league.firstWinPolicy?.version === FIRST_WIN_POLICY.version &&
+          article.id === footballFirstWinArticle.id
+        ? "恢复默认首胜公告"
+        : "";
   return (
     <div className="news-page">
       {editing && admin ? (
@@ -227,22 +238,14 @@ export function News({
                 {saved && (
                   <button
                     className="icon-btn danger"
-                    title={
-                      article.id === report?.article.id
-                        ? "恢复自动定榜稿"
-                        : "删除新闻"
-                    }
-                    aria-label={
-                      article.id === report?.article.id
-                        ? "恢复自动定榜稿"
-                        : "删除新闻"
-                    }
+                    title={restoreLabel || "删除新闻"}
+                    aria-label={restoreLabel || "删除新闻"}
                     disabled={busy}
                     onClick={async () => {
                       if (
                         confirm(
-                          article.id === report?.article.id
-                            ? "恢复根据比赛记录生成的定榜稿？"
+                          restoreLabel
+                            ? `${restoreLabel}？`
                             : "删除这篇新闻？",
                         )
                       ) {
