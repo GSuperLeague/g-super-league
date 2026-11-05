@@ -1195,7 +1195,7 @@ export default function Badminton({ route }: { route: string[] }) {
                     >
                       <img
                         src={gbLeagueLogo}
-                        alt="GB 羽毛球联赛 Logo：九人彩虹热气球"
+                        alt="GB 羽毛球联赛 Logo：九人白羽毛球热气球"
                         width={1254}
                         height={1254}
                       />
