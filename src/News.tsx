@@ -114,7 +114,11 @@ export function News({
       : league.firstWinPolicy?.version === FIRST_WIN_POLICY.version &&
           article.id === footballFirstWinArticle.id
         ? "恢复默认每日奖励公告"
-        : selectedPromo ? "恢复默认赛季预告" : "";
+        : selectedPromo
+          ? selectedPromo.id === "s1"
+            ? "恢复默认赛季介绍"
+            : "恢复默认赛季预告"
+          : "";
   return (
     <div className="news-page">
       {editing && admin ? (

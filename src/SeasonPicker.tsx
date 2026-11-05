@@ -1,7 +1,7 @@
 import { CalendarDays } from "lucide-react";
 import { SEASONS } from "../lib/seasons.ts";
 import type { SeasonId } from "../lib/seasons.ts";
-import { footballSeasonLabel } from "../lib/season-promos.ts";
+import { FOOTBALL_CURRENT_THEME, footballSeasonLabel } from "../lib/season-promos.ts";
 import "./seasons.css";
 
 export function SeasonPicker({
@@ -21,7 +21,7 @@ export function SeasonPicker({
       >
         {SEASONS.map((season) => (
           <option key={season.id} value={season.id}>
-            {season.name}
+            {season.id === "s1" ? FOOTBALL_CURRENT_THEME : season.name}
           </option>
         ))}
       </select>
