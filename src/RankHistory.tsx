@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowRight, ChevronDown, ChevronRight, History } from "lucide-react";
 import { rankHistorySummary } from "../lib/rank-history.ts";
 import type { RankHistoryEntry } from "../lib/rank-history.ts";
+import { DailyRewardBreakdown } from "./DailyRewardBreakdown";
 import "./rank-history.css";
 
 const signed = (value: number | null) =>
@@ -38,6 +39,9 @@ export function RankHistory({
   const firstWinPoints = entries.reduce(
     (sum, entry) => sum + (entry.firstWinBonus || 0),
     0,
+  );
+  const participationPoints = entries.reduce(
+    (sum, entry) => sum + (entry.participationBonus || 0), 0,
   );
   return (
     <section className="rank-history" aria-label="每场加减分">
@@ -116,22 +120,12 @@ export function RankHistory({
                   <strong className={tone(entry.delta)}>
                     {signed(entry.delta)}
                   </strong>
-                  {(entry.firstWinBonus || 0) > 0 && (
-                    <small className="first-win-breakdown">
-                      基础{" "}
-                      {signed(
-                        entry.baseDelta ??
-                          (entry.delta || 0) - (entry.firstWinBonus || 0),
-                      )}{" "}
-                      ·{" "}
-                      {entry.role === "forward"
-                        ? "前锋"
-                        : entry.role === "defender"
-                          ? "后卫"
-                          : "每日"}
-                      首胜 +{entry.firstWinBonus}
-                    </small>
-                  )}
+                  <DailyRewardBreakdown
+                    baseDelta={entry.baseDelta ?? (entry.delta === null ? null : entry.delta - (entry.firstWinBonus || 0) - (entry.participationBonus || 0))}
+                    firstWinBonus={entry.firstWinBonus}
+                    participationBonus={entry.participationBonus}
+                    firstWinLabel={entry.role === "forward" ? "前锋首胜" : entry.role === "defender" ? "后卫首胜" : "每日首胜"}
+                  />
                   {entry.delta === null ? (
                     <small>未计分</small>
                   ) : (
@@ -172,6 +166,11 @@ export function RankHistory({
           {firstWinPoints > 0 && (
             <span className="rank-history-first-win-total">
               已含首胜奖励 +{firstWinPoints}
+            </span>
+          )}
+          {participationPoints > 0 && (
+            <span className="rank-history-first-win-total">
+              已含参与奖励 +{participationPoints}
             </span>
           )}
           {entries.some((entry) => entry.delta === null) &&

@@ -1,5 +1,6 @@
 import { score, matchRoles } from "./league.ts";
 import type { League, Match, Player } from "./league.ts";
+import { buildParticipationAwards, participationKey } from "./daily-rewards.ts";
 import {
   inheritRating,
   matchSeason,
@@ -37,6 +38,7 @@ export type Appearance = {
   partnerRankBefore?: number;
   opponentRankBefore?: number;
   firstWinBonus?: number;
+  participationBonus?: number;
   roleFirstWinBonus?: number;
   baseDelta?: number | null;
   roleBaseDelta?: number;
@@ -71,6 +73,7 @@ export type PlayerStats = {
   mmr: Record<Role, number>;
   ratedGames: Record<Role, number>;
   firstWinPoints: Record<Role, number>;
+  participationPoints: number;
   recent: Metrics;
   form: Result[];
 };
@@ -90,6 +93,7 @@ export type RatingChange = {
   after: number | null;
   delta: number | null;
   firstWinBonus?: number;
+  participationBonus?: number;
   baseDelta?: number | null;
 };
 export type MatchRating = {
@@ -174,8 +178,7 @@ const chronological = (a: Match, b: Match) =>
   (a.summary?.recordedAt || "").localeCompare(b.summary?.recordedAt || "") ||
   a.id.localeCompare(b.id);
 
-export function doublesFirstWinAwards(league: League): Record<string, number> {
-  if (league.seasonId === "beta") return {};
+function doublesRewardCandidates(league: League) {
   const known = new Set(league.players.map((p) => p.id));
   const candidates = league.matches
     .filter((m) => m.status === "finished")
@@ -201,6 +204,8 @@ export function doublesFirstWinAwards(league: League): Record<string, number> {
       return {
         id: match.id,
         time: match.time,
+        playerIds: valid ? roles : [],
+        winnerIds: valid && a !== b ? roles.slice(offset, offset + 2) : [],
         winners:
           valid && a !== b
             ? [
@@ -210,7 +215,18 @@ export function doublesFirstWinAwards(league: League): Record<string, number> {
             : [],
       };
     });
-  return buildFirstWinAwards(candidates, league.firstWinPolicy);
+  return candidates;
+}
+
+export function doublesFirstWinAwards(league: League): Record<string, number> {
+  if (league.seasonId === "beta") return {};
+  return buildFirstWinAwards(doublesRewardCandidates(league), league.firstWinPolicy);
+}
+
+export function doublesParticipationAwards(league: League): Record<string, number> {
+  if (league.seasonId === "beta" || league.firstWinPolicy?.version !== FIRST_WIN_POLICY.version)
+    return {};
+  return buildParticipationAwards(doublesRewardCandidates(league), league.firstWinPolicy);
 }
 
 export function analyzeLeague(league: League): Analytics {
@@ -225,6 +241,10 @@ export function analyzeLeague(league: League): Analytics {
   const bonusPoints = new Map(
     league.players.map((p) => [p.id, { overall: 0, forward: 0, defender: 0 }]),
   );
+  const participationAwards = legacy || league.firstWinPolicy?.version !== FIRST_WIN_POLICY.version
+    ? {}
+    : (league.participationAwards ?? doublesParticipationAwards(league));
+  const participationPoints = new Map(league.players.map((p) => [p.id, 0]));
   const histories = new Map(
     league.players.map((p) => [p.id, [] as Appearance[]]),
   );
@@ -299,7 +319,7 @@ export function analyzeLeague(league: League): Analytics {
         .map((id) => [
           id,
           {
-            overall: rankPoints.get(id)!.overall + bonusPoints.get(id)!.overall,
+            overall: rankPoints.get(id)!.overall + bonusPoints.get(id)!.overall + participationPoints.get(id)!,
             forward: rankPoints.get(id)!.forward + bonusPoints.get(id)!.forward,
             defender:
               rankPoints.get(id)!.defender + bonusPoints.get(id)!.defender,
@@ -371,6 +391,7 @@ export function analyzeLeague(league: League): Analytics {
         const bonus = awards[firstWinKey(match.id, id, role)] || 0;
         bonusPoints.get(id)!.overall += bonus;
         bonusPoints.get(id)![role] += bonus;
+        participationPoints.set(id, participationPoints.get(id)! + (participationAwards[participationKey(match.id, id)] || 0));
       });
     }
     rosters.forEach((roster, side) => {
@@ -394,7 +415,7 @@ export function analyzeLeague(league: League): Analytics {
           partners: roster.filter((pid) => pid !== id),
           opponents: rosters[1 - side],
           rankPoints: rated
-            ? rankPoints.get(id)!.overall + bonusPoints.get(id)!.overall
+            ? rankPoints.get(id)!.overall + bonusPoints.get(id)!.overall + participationPoints.get(id)!
             : undefined,
           roleRankPoints:
             rated && role
@@ -420,6 +441,9 @@ export function analyzeLeague(league: League): Analytics {
             rated && role
               ? awards[firstWinKey(match.id, id, role)] || 0
               : undefined,
+          participationBonus: rated
+            ? participationAwards[participationKey(match.id, id)] || 0
+            : undefined,
           baseDelta: rated
             ? rankPoints.get(id)!.overall - preRankPoints.get(id)!.overall
             : undefined,
@@ -479,7 +503,7 @@ export function analyzeLeague(league: League): Analytics {
             : {
                 overall:
                   rankPoints.get(player.id)!.overall +
-                  bonusPoints.get(player.id)!.overall,
+                  bonusPoints.get(player.id)!.overall + participationPoints.get(player.id)!,
                 forward:
                   rankPoints.get(player.id)!.forward +
                   bonusPoints.get(player.id)!.forward,
@@ -497,6 +521,7 @@ export function analyzeLeague(league: League): Analytics {
             : ratings.get(player.id)!,
         ratedGames: ratedGames.get(player.id)!,
         firstWinPoints: bonusPoints.get(player.id)!,
+        participationPoints: participationPoints.get(player.id)!,
         recent: summarize(history.slice(-10)),
         form: history.slice(-10).map((r) => r.result),
       };
@@ -521,6 +546,7 @@ export function leagueForSeason(league: League, season: SeasonId): League {
     seasonId: "beta",
     ratingSeeds: undefined,
     firstWinAwards: {},
+    participationAwards: {},
     settings: {
       ...(archive?.settings || league.settings),
       season: seasonName("beta"),
@@ -556,6 +582,7 @@ export function leagueForSeason(league: League, season: SeasonId): League {
       ),
   };
   next.firstWinAwards = doublesFirstWinAwards(next);
+  next.participationAwards = doublesParticipationAwards(next);
   return next;
 }
 
@@ -695,7 +722,11 @@ export function matchRatings(
   league: League,
   match: Match,
 ): { rated: boolean; players: MatchRating[] } {
-  // Replay only through this match, so later results cannot leak into its before/after values.
+  league = {
+    ...league,
+    participationAwards: league.participationAwards ?? doublesParticipationAwards(league),
+  };
+  // Replay base scores through this match; reward eligibility uses the complete day.
   const earlier = league.matches.filter(
     (m) => m.id !== match.id && chronological(m, match) < 0,
   );
@@ -720,6 +751,7 @@ export function matchRatings(
       (role === "overall"
         ? history?.firstWinBonus
         : history?.roleFirstWinBonus) || 0;
+    const participationBonus = role === "overall" ? history?.participationBonus || 0 : 0;
     return {
       before: start,
       after: end,
@@ -727,7 +759,8 @@ export function matchRatings(
       ...(league.firstWinPolicy && league.seasonId !== "beta"
         ? {
             firstWinBonus: bonus,
-            baseDelta: end === null ? null : end - start - bonus,
+            participationBonus,
+            baseDelta: end === null ? null : end - start - bonus - participationBonus,
           }
         : {}),
     };

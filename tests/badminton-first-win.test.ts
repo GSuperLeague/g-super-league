@@ -65,7 +65,8 @@ test("GB awards the earliest valid win retroactively, including newly backfilled
   assert.equal(winner.history[0].baseDelta, 16);
   assert.equal(winner.history[0].firstWinBonus, 10);
   assert.equal(winner.history[0].delta, 26);
-  assert.equal(player(league, "C").rankPoints, 1184);
+  assert.equal(player(league, "C").rankPoints, 1189);
+  assert.equal(player(league, "C").participationPoints, 5);
   assert.equal(player(league, "C").firstWinPoints, 0);
   const backfilled = finish(league, "earlier-history", "2026-09-20T10:00:00+08:00");
   assert.deepEqual(player(backfilled).history.map((h) => h.match.id), ["earlier-history", "original-first"]);
@@ -83,7 +84,9 @@ test("one award per mode per day; the award does not bias the next Elo settlemen
   assert.deepEqual(winner.history.map((h) => h.delta), [26, 15]);
   assert.equal(winner.rankPoints, 1241);
   assert.equal(winner.firstWinPoints, 10);
-  assert.deepEqual(player(league, "C").history.map((h) => h.delta), [-16, -15]);
+  assert.deepEqual(player(league, "C").history.map((h) => h.baseDelta), [-16, -15]);
+  assert.deepEqual(player(league, "C").history.map((h) => h.participationBonus), [5, 0]);
+  assert.deepEqual(player(league, "C").history.map((h) => h.delta), [-11, -15]);
 });
 
 test("Beijing midnight refreshes eligibility even while the UTC calendar day is unchanged", () => {
@@ -172,9 +175,10 @@ test("mixed wins and changing partners retain every baseline Elo delta independe
   };
   for (const current of analyzeBadminton(league, "doubles")) {
     const anchor = expected[current.player.id];
-    assert.equal(current.rankPoints - current.firstWinPoints, anchor.base);
+    assert.equal(current.rankPoints - current.firstWinPoints - current.participationPoints, anchor.base);
     assert.deepEqual(current.history.map((h) => h.baseDelta), anchor.deltas);
     assert.equal(current.firstWinPoints, anchor.bonus);
-    for (const h of current.history) assert.equal(h.delta, h.baseDelta + h.firstWinBonus);
+    assert.equal(current.participationPoints, current.player.id === "B" ? 5 : 0);
+    for (const h of current.history) assert.equal(h.delta, h.baseDelta + h.firstWinBonus + h.participationBonus);
   }
 });

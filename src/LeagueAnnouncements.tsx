@@ -15,7 +15,7 @@ export function LeagueAnnouncements({
       <header>
         <Megaphone size={18} aria-hidden="true" />
         <h2>联赛公告</h2>
-        <span>每日首胜，为下一场加点动力。</span>
+        <span>参与有奖励，首胜不叠加参与分。</span>
       </header>
       <div className={`league-announcement-grid${sport ? " is-single" : ""}`}>
         {entries.map(({ label, effectiveLabel, article }) => (

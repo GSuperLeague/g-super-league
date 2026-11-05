@@ -1,3 +1,5 @@
+import { buildParticipationAwards, participationKey } from "./daily-rewards.ts";
+
 export type BadmintonMode = "singles" | "doubles";
 export const BADMINTON_FIRST_WIN_POLICY = {
   timeZone: "Asia/Shanghai",
@@ -384,6 +386,7 @@ export type BadmintonAppearance = {
   delta: number;
   baseDelta: number;
   firstWinBonus: number;
+  participationBonus: number;
   partnerIds: string[];
   opponentIds: string[];
   pointsFor: number;
@@ -393,6 +396,7 @@ export type BadmintonStats = {
   player: BadmintonPlayer;
   rankPoints: number;
   firstWinPoints: number;
+  participationPoints: number;
   games: number;
   wins: number;
   losses: number;
@@ -411,6 +415,7 @@ export function analyzeBadminton(
         player,
         rankPoints: 1200,
         firstWinPoints: 0,
+        participationPoints: 0,
         games: 0,
         wins: 0,
         losses: 0,
@@ -427,7 +432,20 @@ export function analyzeBadminton(
         Date.parse(a.time) - Date.parse(b.time) ||
         a.createdAt.localeCompare(b.createdAt) ||
         a.id.localeCompare(b.id),
-    );
+    )
+    .filter((match) => {
+      const count = mode === "singles" ? 1 : 2;
+      return badmintonWinner(match) !== null &&
+        match.homePlayers.length === count && match.awayPlayers.length === count &&
+        new Set([...match.homePlayers, ...match.awayPlayers]).size === count * 2 &&
+        [...match.homePlayers, ...match.awayPlayers].every((id) => stats.has(id));
+    });
+  const participationAwards = buildParticipationAwards(matches.map((m) => ({
+    id: m.id,
+    time: m.time,
+    playerIds: [...m.homePlayers, ...m.awayPlayers],
+    winnerIds: badmintonWinner(m) === "home" ? m.homePlayers : m.awayPlayers,
+  })), BADMINTON_FIRST_WIN_POLICY);
   const firstWins = new Set<string>();
   const dayFormat = new Intl.DateTimeFormat("sv-SE", {
     timeZone: BADMINTON_FIRST_WIN_POLICY.timeZone,
@@ -436,22 +454,12 @@ export function analyzeBadminton(
     day: "2-digit",
   });
   for (const match of matches) {
-    const winner = badmintonWinner(match),
-      score = badmintonScore(match),
-      count = mode === "singles" ? 1 : 2;
-    if (
-      !winner ||
-      match.homePlayers.length !== count ||
-      match.awayPlayers.length !== count ||
-      new Set([...match.homePlayers, ...match.awayPlayers]).size !==
-        count * 2 ||
-      ![...match.homePlayers, ...match.awayPlayers].every((id) => stats.has(id))
-    )
-      continue;
+    const winner = badmintonWinner(match)!,
+      score = badmintonScore(match);
     const average = (ids: string[]) =>
       ids.reduce((sum, id) => {
         const p = stats.get(id)!;
-        return sum + p.rankPoints - p.firstWinPoints;
+        return sum + p.rankPoints - p.firstWinPoints - p.participationPoints;
       }, 0) / ids.length;
     const expected =
       1 /
@@ -471,7 +479,7 @@ export function analyzeBadminton(
         const p = stats.get(id)!,
           before = p.rankPoints,
           change = side === "home" ? delta : -delta;
-        const baseBefore = before - p.firstWinPoints;
+        const baseBefore = before - p.firstWinPoints - p.participationPoints;
         const baseAfter = Math.max(0, baseBefore + change);
         const firstWinKey = JSON.stringify([mode, id, bonusDay]);
         const firstWinBonus =
@@ -480,7 +488,9 @@ export function analyzeBadminton(
             : 0;
         if (firstWinBonus) firstWins.add(firstWinKey);
         p.firstWinPoints += firstWinBonus;
-        p.rankPoints = baseAfter + p.firstWinPoints;
+        const participationBonus = participationAwards[participationKey(match.id, id)] || 0;
+        p.participationPoints += participationBonus;
+        p.rankPoints = baseAfter + p.firstWinPoints + p.participationPoints;
         p.games++;
         p.wins += Number(winner === side);
         p.losses += Number(winner !== side);
@@ -496,6 +506,7 @@ export function analyzeBadminton(
           delta: p.rankPoints - before,
           baseDelta: baseAfter - baseBefore,
           firstWinBonus,
+          participationBonus,
           partnerIds: roster.filter((x) => x !== id),
           opponentIds: opponents,
           pointsFor,
