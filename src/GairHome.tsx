@@ -187,7 +187,7 @@ export default function GairHome() {
               <p>
                 每一球，都算数。
                 <br />
-                第一赛季「{FOOTBALL_CURRENT_THEME}」，每次弹反都是下一次进攻。
+                第一赛季「{FOOTBALL_CURRENT_THEME}」：借对手来球的力量，弹回去。
               </p>
               <div className="gair-card-counts">
                 <span>

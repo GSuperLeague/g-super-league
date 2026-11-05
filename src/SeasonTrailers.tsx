@@ -27,7 +27,7 @@ export function SeasonTrailers({
             <span>G SUPER LEAGUE / SEASON FILMS</span>
             <h2><Film size={21} aria-hidden="true" /> 赛季预告</h2>
           </div>
-          <p>这一季，读懂角度。下一季，准备爆冲。</p>
+          <p>这一季，借力弹反。下一季，准备爆冲。</p>
         </header>
       )}
       <div className={`season-trailer-grid${season ? " is-single" : ""}`}>
