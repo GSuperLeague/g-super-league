@@ -49,7 +49,7 @@ export function SeasonTrailers({
                 poster={media[promo.id].poster}
                 width={1920}
                 height={1080}
-                aria-label={`${promo.label}「${promo.theme}」${filmLabel}，26秒，带音乐`}
+                aria-label={`${promo.label}「${promo.theme}」${filmLabel}，${promo.durationSeconds}秒，带音乐`}
               >
                 <source src={media[promo.id].video} type="video/mp4" />
                 浏览器暂不支持视频，请使用下方链接下载观看。
@@ -62,7 +62,7 @@ export function SeasonTrailers({
                 <h3>{promo.theme}</h3>
                 <p>{promo.description}</p>
                 <footer>
-                  <span>26秒 · 1080p · 含音乐</span>
+                  <span>{promo.durationSeconds}秒 · 1080p · 含音乐</span>
                   <a href={media[promo.id].video} download={`G超_${promo.label}_${promo.theme}_${filmLabel}.mp4`}>
                     <Download size={14} aria-hidden="true" /> 下载{filmLabel}
                   </a>
