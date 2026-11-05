@@ -864,7 +864,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                       <h2>
                         {season === "s1" ? <>弹反<br /><span>几何</span></> : <>每一球，<br />都<span>算数。</span></>}
                       </h2>
-                      <p>{season === "s1" ? "第一赛季 · 每一次弹反，都是下一次进攻。" : "属于我们的球场，属于每个人的高光。"}</p>
+                      <p>{season === "s1" ? "第一赛季 · 借对手来球的力量，弹回去。" : "属于我们的球场，属于每个人的高光。"}</p>
                       <button
                         className="btn lime"
                         onClick={() =>
