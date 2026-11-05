@@ -126,7 +126,7 @@ test("live deuce continues at 11:10, can be undone, and settles only after a two
   assert.deepEqual(s.matches[0].games, [{ home: 12, away: 11 }]);
   s = act(s, "point.add", "m", { side: "home" });
   s = act(s, "match.finish", "m");
-  assert.equal(analyzeBadminton(s, "singles").find((p) => p.player.id === "A")!.rankPoints, 1216);
+  assert.equal(analyzeBadminton(s, "singles").find((p) => p.player.id === "A")!.rankPoints, 1226);
 });
 test("live points can be undone across a game boundary and do not settle before confirmation", () => {
   let s = act(fixture(), "match.save", "m", { ...details(), startNow: true });
@@ -200,14 +200,14 @@ test("Elo starts at 1200; singles and doubles settle independently with identica
   s = result(s, "double", "doubles");
   const singles = analyzeBadminton(s, "singles"),
     doubles = analyzeBadminton(s, "doubles");
-  assert.equal(singles.find((p) => p.player.id === "A")!.rankPoints, 1216);
+  assert.equal(singles.find((p) => p.player.id === "A")!.rankPoints, 1226);
   assert.equal(singles.find((p) => p.player.id === "C")!.rankPoints, 1184);
   assert.equal(singles.find((p) => p.player.id === "B")!.rankPoints, 1200);
-  assert.equal(doubles.find((p) => p.player.id === "A")!.rankPoints, 1216);
-  assert.equal(doubles.find((p) => p.player.id === "B")!.rankPoints, 1216);
+  assert.equal(doubles.find((p) => p.player.id === "A")!.rankPoints, 1226);
+  assert.equal(doubles.find((p) => p.player.id === "B")!.rankPoints, 1226);
   assert.equal(
     doubles.reduce((sum, p) => sum + p.rankPoints, 0),
-    4800,
+    4820,
   );
   assert.equal(badmintonPairs(s).length, 2);
 });
@@ -220,7 +220,7 @@ test("editing and deleting an earlier match recalculates subsequent history with
   });
   const original = structuredClone(s),
     before = analyzeBadminton(s, "singles").find((p) => p.player.id === "A")!;
-  assert.equal(before.rankPoints, 1231);
+  assert.equal(before.rankPoints, 1241);
   const changed = act(s, "match.result", "m1", {
     ...details(),
     games: [{ home: 8, away: 11 }],
@@ -229,14 +229,16 @@ test("editing and deleting an earlier match recalculates subsequent history with
     (p) => p.player.id === "A",
   )!;
   assert.equal(recalculated.history[1].before, 1184);
-  assert.equal(recalculated.history[1].delta, 17);
-  assert.equal(recalculated.rankPoints, 1201);
+  assert.equal(recalculated.history[1].baseDelta, 17);
+  assert.equal(recalculated.history[1].firstWinBonus, 10);
+  assert.equal(recalculated.history[1].delta, 27);
+  assert.equal(recalculated.rankPoints, 1211);
   assert.deepEqual(s, original);
   const deleted = act(s, "match.delete", "m1");
   assert.equal(
     analyzeBadminton(deleted, "singles").find((p) => p.player.id === "A")!
       .rankPoints,
-    1216,
+    1226,
   );
 });
 test("reopening excludes a match from rankings until it is finished again", () => {
@@ -249,7 +251,7 @@ test("reopening excludes a match from rankings until it is finished again", () =
   s = act(s, "match.finish", "m1");
   assert.equal(
     analyzeBadminton(s, "singles").find((p) => p.player.id === "A")!.rankPoints,
-    1216,
+    1226,
   );
 });
 test("import preserves identity, avoids duplicate registration, and never copies football results", () => {

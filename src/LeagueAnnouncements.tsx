@@ -18,13 +18,13 @@ export function LeagueAnnouncements({
         <span>每日首胜，为下一场加点动力。</span>
       </header>
       <div className={`league-announcement-grid${sport ? " is-single" : ""}`}>
-        {entries.map(({ label, effectiveDate, article }) => (
+        {entries.map(({ label, effectiveLabel, article }) => (
           <article className="league-announcement-card" key={article.id}>
             <span className="league-announcement-label">{label}</span>
             <h3>{article.title}</h3>
             <p className="league-announcement-summary">{article.summary}</p>
             <p className="league-announcement-date">
-              {effectiveDate}起 · 北京时间每日00:00刷新资格
+              {effectiveLabel} · 北京时间每日00:00刷新资格
             </p>
             <details>
               <summary>奖励说明与计算示例</summary>

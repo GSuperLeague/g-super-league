@@ -33,7 +33,7 @@ export const badmintonFirstWinArticle: NewsArticle = {
   title: "羽毛球每日首胜奖励公告",
   summary: `单打首胜 +${badmintonPoints}，双打首胜 +${badmintonPoints}；每天各一次，两个项目分别计算。`,
   body: [
-    `从北京时间${effectiveDate(BADMINTON_FIRST_WIN_POLICY.startsAt)}起，GB羽毛球联赛启用每日首胜奖励，此前比赛沿用原有计分。`,
+    "GB羽毛球每日首胜奖励从首场有效比赛开始补算，覆盖全部历史有效完赛；后续补录更早的比赛，也会按实际比赛时间重新认定首胜。",
     `单打：球员当天第一次赢得单打比赛，单打段位分额外 +${badmintonPoints}。双打：球员当天第一次赢得双打比赛，双打段位分额外 +${badmintonPoints}；同队两位球员分别判断各自的首胜资格。`,
     `单打、双打每天各一次，分别加到各自的段位分。同一天先赢单打、再赢双打，可以在两个项目各领 +${badmintonPoints}；同项目当天再次取胜不重复领取。`,
     "首胜资格每天北京时间00:00刷新，已获得的奖励分数保留；按实际比赛发生时间及既有结算顺序认定。只计算已确认完赛、阵容有效的整场比赛，单局胜利不单独领奖；输球、未完赛不占用资格。补录、修改、重新打开或删除比赛后自动重新计算。",
@@ -47,13 +47,13 @@ export const firstWinAnnouncements = [
   {
     sport: "football",
     label: "G超 · 桌足联赛",
-    effectiveDate: effectiveDate(FIRST_WIN_POLICY.startsAt),
+    effectiveLabel: `${effectiveDate(FIRST_WIN_POLICY.startsAt)}起`,
     article: footballFirstWinArticle,
   },
   {
     sport: "badminton",
     label: "GB · 羽毛球联赛",
-    effectiveDate: effectiveDate(BADMINTON_FIRST_WIN_POLICY.startsAt),
+    effectiveLabel: "自首场有效比赛起补算",
     article: badmintonFirstWinArticle,
   },
 ] as const;
