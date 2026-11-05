@@ -38,7 +38,7 @@ export function SeasonTrailers({
                   </span>
                   <h2><Film size={21} aria-hidden="true" /> {current ? "当前赛季" : "赛季预告"}</h2>
                 </div>
-                <p>{current ? "第一赛季已正式开赛，正在进行中。" : "下一季，准备迎接爆冲流。"}</p>
+                <p>{current ? "第一赛季已正式开赛，正在进行中。" : "下一季，连续狂转数圈，高速出球。"}</p>
               </header>
             )}
             <article className={`season-trailer-card ${promo.id}`}>
