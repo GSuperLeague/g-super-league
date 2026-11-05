@@ -57,19 +57,21 @@ function finish(
 const player = (league: BadmintonLeague, id = "A", mode: BadmintonMode = "singles") =>
   analyzeBadminton(league, mode).find((p) => p.player.id === id)!;
 
-test("GB first win starts at Beijing midnight on November 5, without changing earlier results", () => {
-  const before = finish(fixture(), "before", "2026-11-04T15:59:59Z");
-  assert.equal(player(before).rankPoints, 1216);
-  assert.equal(player(before).firstWinPoints, 0);
-  const atStart = finish(fixture(), "start", "2026-11-04T16:00:00Z");
-  const winner = player(atStart);
+test("GB awards the earliest valid win retroactively, including newly backfilled earlier history", () => {
+  const league = finish(fixture(), "original-first", "2026-11-04T15:59:59Z");
+  const winner = player(league);
   assert.equal(winner.rankPoints, 1226);
   assert.equal(winner.firstWinPoints, 10);
   assert.equal(winner.history[0].baseDelta, 16);
   assert.equal(winner.history[0].firstWinBonus, 10);
   assert.equal(winner.history[0].delta, 26);
-  assert.equal(player(atStart, "C").rankPoints, 1184);
-  assert.equal(player(atStart, "C").firstWinPoints, 0);
+  assert.equal(player(league, "C").rankPoints, 1184);
+  assert.equal(player(league, "C").firstWinPoints, 0);
+  const backfilled = finish(league, "earlier-history", "2026-09-20T10:00:00+08:00");
+  assert.deepEqual(player(backfilled).history.map((h) => h.match.id), ["earlier-history", "original-first"]);
+  assert.deepEqual(player(backfilled).history.map((h) => h.firstWinBonus), [10, 10]);
+  assert.equal(player(backfilled).rankPoints, 1251);
+  assert.equal(player(backfilled).firstWinPoints, 20);
 });
 
 test("one award per mode per day; the award does not bias the next Elo settlement", () => {
@@ -162,15 +164,17 @@ test("mixed wins and changing partners retain every baseline Elo delta independe
   league = finish(league, "m2", "2026-11-05T11:00:00+08:00", { mode: "doubles", winner: "away" });
   league = finish(league, "m3", "2026-11-06T10:00:00+08:00", { mode: "doubles", homePlayers: ["A", "D"], awayPlayers: ["B", "C"] });
   league = finish(league, "m4", "2026-11-06T11:00:00+08:00", { mode: "doubles", winner: "away" });
-  const legacy = structuredClone(league);
-  for (const match of legacy.matches)
-    match.time = new Date(Date.parse(match.time) - 10 * 86400000).toISOString();
-  const baseline = analyzeBadminton(legacy, "doubles");
+  const expected: Record<string, { base: number; deltas: number[]; bonus: number }> = {
+    A: { base: 1199, deltas: [16, -17, 16, -16], bonus: 20 },
+    B: { base: 1167, deltas: [16, -17, -16, -16], bonus: 10 },
+    C: { base: 1201, deltas: [-16, 17, -16, 16], bonus: 20 },
+    D: { base: 1233, deltas: [-16, 17, 16, 16], bonus: 20 },
+  };
   for (const current of analyzeBadminton(league, "doubles")) {
-    const before = baseline.find((p) => p.player.id === current.player.id)!;
-    assert.equal(current.rankPoints - current.firstWinPoints, before.rankPoints);
-    assert.deepEqual(current.history.map((h) => h.baseDelta), before.history.map((h) => h.delta));
-    assert.equal(current.firstWinPoints, current.history.reduce((sum, h) => sum + h.firstWinBonus, 0));
+    const anchor = expected[current.player.id];
+    assert.equal(current.rankPoints - current.firstWinPoints, anchor.base);
+    assert.deepEqual(current.history.map((h) => h.baseDelta), anchor.deltas);
+    assert.equal(current.firstWinPoints, anchor.bonus);
     for (const h of current.history) assert.equal(h.delta, h.baseDelta + h.firstWinBonus);
   }
 });

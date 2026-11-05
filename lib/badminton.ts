@@ -1,6 +1,5 @@
 export type BadmintonMode = "singles" | "doubles";
 export const BADMINTON_FIRST_WIN_POLICY = {
-  startsAt: "2026-11-05T00:00:00+08:00",
   timeZone: "Asia/Shanghai",
   points: 10,
 } as const;
@@ -462,11 +461,9 @@ export function analyzeBadminton(
     const raw = 32 * ((winner === "home" ? 1 : 0) - expected);
     const delta = Math.sign(raw) * Math.round(Math.abs(raw));
     const matchTime = Date.parse(match.time);
-    const bonusDay =
-      Number.isFinite(matchTime) &&
-      matchTime >= Date.parse(BADMINTON_FIRST_WIN_POLICY.startsAt)
-        ? dayFormat.format(new Date(matchTime))
-        : null;
+    const bonusDay = Number.isFinite(matchTime)
+      ? dayFormat.format(new Date(matchTime))
+      : null;
     for (const side of ["home", "away"] as const) {
       const roster = side === "home" ? match.homePlayers : match.awayPlayers,
         opponents = side === "home" ? match.awayPlayers : match.homePlayers;
