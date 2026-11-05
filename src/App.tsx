@@ -12,7 +12,8 @@ import { ScoringNotice } from "./ScoringNotice";
 import { SeasonTrailers } from "./SeasonTrailers";
 import { footballSeasonLabel } from "../lib/season-promos.ts";
 import gSuperLeagueLogo from "./assets/g-super-league-logo-640.png";
-import gSuperLeagueLogoFull from "./assets/g-super-league-logo.png";
+import gSuperFoosballArt from "./assets/g-super-foosball-eight-960.webp";
+import gSuperFoosballArtFull from "./assets/g-super-foosball-eight.png";
 import type { SeasonId } from "../lib/seasons.ts";
 import { SeasonPicker } from "./SeasonPicker";
 import { News } from "./News";
@@ -879,17 +880,17 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                       </div>
                     </div>
                     <a
-                      className="g-super-hero-logo"
-                      href={gSuperLeagueLogoFull}
+                      className="g-super-hero-art"
+                      href={gSuperFoosballArtFull}
                       target="_blank"
                       rel="noreferrer"
-                      aria-label="查看 G超联赛 Logo 大图"
+                      aria-label="查看八人桌足球台插画大图"
                     >
                       <img
-                        src={gSuperLeagueLogo}
-                        alt="G超桌足联赛 Logo：七人彩虹热气球"
-                        width={1254}
-                        height={1254}
+                        src={gSuperFoosballArt}
+                        alt="G超联赛八位球员的Q版桌足球台插画"
+                        width={1536}
+                        height={1024}
                       />
                     </a>
                   </section>

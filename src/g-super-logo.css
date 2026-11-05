@@ -22,7 +22,7 @@
 
 .hero.g-super-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.3fr);
   align-items: center;
   height: auto;
   min-height: 306px;
@@ -38,7 +38,7 @@
   display: none;
 }
 
-.g-super-hero-logo {
+.g-super-hero-art {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -49,9 +49,11 @@
   z-index: 2;
 }
 
-.g-super-hero-logo img {
+.g-super-hero-art img {
   display: block;
-  width: min(100%, 290px);
+  width: 100%;
+  max-width: 640px;
+  border-radius: 12px;
   height: auto;
   object-fit: contain;
 }
@@ -85,11 +87,12 @@
     padding-bottom: 0;
   }
 
-  .g-super-hero-logo {
+  .g-super-hero-art {
     padding: 22px 24px 26px;
   }
 
-  .g-super-hero-logo img {
-    width: min(100%, 240px);
+  .g-super-hero-art img {
+    width: 100%;
+    max-width: 560px;
   }
 }
