@@ -9,6 +9,8 @@ import {
 import { leagueForSeason } from "../lib/analytics.ts";
 import { matchSeason, assertSeasonWritable } from "../lib/seasons.ts";
 import { ScoringNotice } from "./ScoringNotice";
+import { SeasonTrailers } from "./SeasonTrailers";
+import { footballSeasonLabel } from "../lib/season-promos.ts";
 import gSuperLeagueLogo from "./assets/g-super-league-logo-640.png";
 import gSuperLeagueLogoFull from "./assets/g-super-league-logo.png";
 import type { SeasonId } from "../lib/seasons.ts";
@@ -801,7 +803,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
               {page !== "news" && (
                 <div className="season-context">
                   <strong>
-                    {s.settings.season}
+                    {footballSeasonLabel(season)}
                     {season === "beta" ? " · 已收官" : " · 进行中"}
                   </strong>
                   <span>
@@ -860,10 +862,9 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                         G超 · 桌面足球超级联赛
                       </div>
                       <h2>
-                        每一球，
-                        <br />都<span>算数。</span>
+                        {season === "s1" ? <>弹反<br /><span>几何</span></> : <>每一球，<br />都<span>算数。</span></>}
                       </h2>
-                      <p>属于我们的球场，属于每个人的高光。</p>
+                      <p>{season === "s1" ? "第一赛季 · 每一次弹反，都是下一次进攻。" : "属于我们的球场，属于每个人的高光。"}</p>
                       <button
                         className="btn lime"
                         onClick={() =>
@@ -943,6 +944,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                       </div>
                     ))}
                   </div>
+                  {season === "s1" && <SeasonTrailers />}
                   {(!s.teams.length ||
                     !s.players.length ||
                     !rawLeague.matches.length) && (
