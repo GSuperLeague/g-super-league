@@ -20,7 +20,9 @@ import type { SinglesLeague } from "../lib/singles.ts";
 import type { NewsArticle } from "../lib/news.ts";
 import { betaReport } from "../lib/season-news.ts";
 import { footballFirstWinArticle } from "../lib/rule-announcements.ts";
-import { FIRST_WIN_POLICY, SEASONS, seasonName } from "../lib/seasons.ts";
+import { FIRST_WIN_POLICY, SEASONS } from "../lib/seasons.ts";
+import { footballSeasonPromos, footballSeasonLabel } from "../lib/season-promos.ts";
+import { SeasonTrailers } from "./SeasonTrailers";
 import "./news.css";
 
 const dateLabel = (time: string) =>
@@ -36,6 +38,10 @@ const dateInput = (time: string) =>
     .slice(0, 16)
     .replace(" ", "T");
 type NewsAction = { type: string; id: string; data?: unknown };
+const newsSeasonLabel = (article: NewsArticle) =>
+  footballSeasonPromos.some((promo) => promo.id === "s2" && promo.article.id === article.id)
+    ? "第二赛季预告"
+    : footballSeasonLabel(article.season);
 
 export function News({
   league,
@@ -57,6 +63,7 @@ export function News({
   const articles = useMemo(() => {
     const result = new Map<string, NewsArticle>();
     if (report) result.set(report.article.id, report.article);
+    for (const promo of footballSeasonPromos) result.set(promo.article.id, promo.article);
     if (league.firstWinPolicy?.version === FIRST_WIN_POLICY.version)
       result.set(footballFirstWinArticle.id, footballFirstWinArticle);
     for (const article of league.news || []) result.set(article.id, article);
@@ -72,6 +79,7 @@ export function News({
   const [editing, setEditing] = useState<NewsArticle | null>(null);
   const [formError, setFormError] = useState("");
   const article = articles.find((a) => a.id === selected);
+  const selectedPromo = footballSeasonPromos.find((promo) => promo.article.id === article?.id);
   const structured =
     article &&
     article.id === report?.article.id &&
@@ -106,7 +114,7 @@ export function News({
       : league.firstWinPolicy?.version === FIRST_WIN_POLICY.version &&
           article.id === footballFirstWinArticle.id
         ? "恢复默认每日奖励公告"
-        : "";
+        : selectedPromo ? "恢复默认赛季预告" : "";
   return (
     <div className="news-page">
       {editing && admin ? (
@@ -265,7 +273,7 @@ export function News({
           <article className="news-reader">
             <header className="news-article-heading">
               <div className="news-meta">
-                <span>{seasonName(article.season)}</span>
+                <span>{newsSeasonLabel(article)}</span>
                 <time dateTime={article.publishedAt}>
                   <CalendarDays size={13} />
                   {dateLabel(article.publishedAt)}
@@ -276,6 +284,7 @@ export function News({
                 <p className="news-deck">{article.summary}</p>
               )}
             </header>
+            {selectedPromo && <SeasonTrailers season={selectedPromo.id} withHeading={false} />}
             {structured ? (
               <>
                 <p className="news-paragraph">
@@ -514,7 +523,7 @@ export function News({
                   <time dateTime={a.publishedAt}>
                     {dateLabel(a.publishedAt)}
                   </time>
-                  <span>{seasonName(a.season)}</span>
+                  <span>{newsSeasonLabel(a)}</span>
                 </div>
                 <div>
                   <h2>{a.title}</h2>

@@ -1,6 +1,7 @@
 import { CalendarDays } from "lucide-react";
 import { SEASONS } from "../lib/seasons.ts";
 import type { SeasonId } from "../lib/seasons.ts";
+import { footballSeasonLabel } from "../lib/season-promos.ts";
 import "./seasons.css";
 
 export function SeasonPicker({
@@ -11,7 +12,7 @@ export function SeasonPicker({
   onChange: (id: SeasonId) => void;
 }) {
   return (
-    <label className="season-picker">
+    <label className="season-picker" title={footballSeasonLabel(value)}>
       <CalendarDays size={15} aria-hidden="true" />
       <select
         aria-label="赛季"

@@ -11,6 +11,8 @@ import { badmintonApiBase } from "./badminton-api";
 import gbLeagueLogo from "./assets/gb-league-logo-640.png";
 import gSuperLeagueLogo from "./assets/g-super-league-logo-640.png";
 import { LeagueAnnouncements } from "./LeagueAnnouncements";
+import { SeasonTrailers } from "./SeasonTrailers";
+import { FOOTBALL_CURRENT_THEME } from "../lib/season-promos.ts";
 import "./gair.css";
 export function ShuttleIcon({ size = 24 }: { size?: number }) {
   return (
@@ -160,6 +162,7 @@ export default function GairHome() {
             <span className="gair-visual-caption">小小球场，大大热爱。</span>
           </div>
         </section>
+        <SeasonTrailers />
         <LeagueAnnouncements />
         <div className="gair-section-heading">
           <div>
@@ -175,7 +178,7 @@ export default function GairHome() {
                 <img src={gSuperLeagueLogo} alt="" width={1254} height={1254} />
               </span>
               <span className="gair-card-badge">
-                <i /> 正在进行
+                <i /> 第一赛季 · {FOOTBALL_CURRENT_THEME}
               </span>
             </div>
             <div className="gair-card-body">
@@ -184,7 +187,7 @@ export default function GairHome() {
               <p>
                 每一球，都算数。
                 <br />
-                默契搭档，精彩攻防，熟悉的球桌继续开赛。
+                第一赛季「{FOOTBALL_CURRENT_THEME}」，每次弹反都是下一次进攻。
               </p>
               <div className="gair-card-counts">
                 <span>
