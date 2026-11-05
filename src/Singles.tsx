@@ -28,6 +28,7 @@ import { SeasonPicker } from "./SeasonPicker";
 import { News } from "./News";
 import { matchSeason, assertSeasonWritable } from "../lib/seasons.ts";
 import { ScoringNotice } from "./ScoringNotice";
+import { DailyRewardBreakdown } from "./DailyRewardBreakdown";
 import type { SeasonId } from "../lib/seasons.ts";
 import { Modal } from "./App";
 import { RankLegend, RankScore } from "./RankScore";
@@ -1744,15 +1745,12 @@ function MatchDetail({
                     </span>
                     <b className={h.delta >= 0 ? "positive" : "negative"}>
                       {signed(h.delta)}
-                      {(h.firstWinBonus || 0) > 0 && (
-                        <small className="first-win-breakdown">
-                          基础{" "}
-                          {signed(
-                            h.baseDelta ?? h.delta - (h.firstWinBonus || 0),
-                          )}{" "}
-                          · 每日首胜 +{h.firstWinBonus}
-                        </small>
-                      )}
+                      <DailyRewardBreakdown
+                        baseDelta={h.baseDelta ?? h.delta - (h.firstWinBonus || 0) - (h.participationBonus || 0)}
+                        firstWinBonus={h.firstWinBonus}
+                        participationBonus={h.participationBonus}
+                        firstWinLabel="每日首胜"
+                      />
                     </b>
                   </div>
                 )

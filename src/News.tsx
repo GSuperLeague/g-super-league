@@ -105,7 +105,7 @@ export function News({
       ? "恢复自动定榜稿"
       : league.firstWinPolicy?.version === FIRST_WIN_POLICY.version &&
           article.id === footballFirstWinArticle.id
-        ? "恢复默认首胜公告"
+        ? "恢复默认每日奖励公告"
         : "";
   return (
     <div className="news-page">

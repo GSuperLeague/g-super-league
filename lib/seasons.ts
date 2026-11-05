@@ -40,6 +40,7 @@ export type SeasonContext<T, M = unknown, P = unknown, Team = unknown> = {
   firstWinPolicy?: FirstWinPolicy;
   // Derived from the complete season before applying UI filters.
   firstWinAwards?: Record<string, number>;
+  participationAwards?: Record<string, number>;
 };
 
 export type WinPosition = "forward" | "defender" | "singles";

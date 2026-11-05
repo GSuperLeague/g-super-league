@@ -1,4 +1,5 @@
 import type { Goal, League, Player } from "./league.ts";
+import { buildParticipationAwards, participationKey } from "./daily-rewards.ts";
 import {
   inheritRating,
   matchSeason,
@@ -247,6 +248,7 @@ export type SinglesAppearance = {
   after: number;
   delta: number;
   firstWinBonus?: number;
+  participationBonus?: number;
   baseDelta?: number;
 };
 export type SinglesStats = {
@@ -261,6 +263,7 @@ export type SinglesStats = {
   points: number;
   rankPoints: number;
   firstWinPoints: number;
+  participationPoints: number;
   mmr: number;
   winRate: number | null;
   ownGoals: number;
@@ -275,6 +278,8 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
   const margin = legacy ? ratingV1.marginMultiplier : marginMultiplier;
   const changeMmr = legacy ? ratingV1.mmrChange : mmrChange;
   const awards = legacy ? {} : (s.firstWinAwards ?? singlesFirstWinAwards(s));
+  const participationAwards = legacy || s.firstWinPolicy?.version !== FIRST_WIN_POLICY.version
+    ? {} : (s.participationAwards ?? singlesParticipationAwards(s));
   const stats = new Map<string, SinglesStats>(
     s.players.map((player) => [
       player.id,
@@ -290,6 +295,7 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
         points: 0,
         rankPoints: s.ratingSeeds?.[player.id]?.rankPoints ?? RATING_BASE,
         firstWinPoints: 0,
+        participationPoints: 0,
         mmr: s.ratingSeeds?.[player.id]?.mmr ?? RATING_BASE,
         winRate: null,
         ownGoals: 0,
@@ -324,7 +330,7 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
     ] as const) {
       const result = gf > ga ? "W" : gf < ga ? "L" : "D";
       const baseBefore = self.rankPoints;
-      const before = baseBefore + self.firstWinPoints;
+      const before = baseBefore + self.firstWinPoints + self.participationPoints;
       self.rankPoints = nextPoints(
         baseBefore,
         self.mmr,
@@ -350,6 +356,8 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
       const bonus =
         awards[firstWinKey(match.id, self.player.id, "singles")] || 0;
       self.firstWinPoints += bonus;
+      const participationBonus = participationAwards[participationKey(match.id, self.player.id)] || 0;
+      self.participationPoints += participationBonus;
       self.history.push({
         match,
         opponentId: opponent.player.id,
@@ -357,9 +365,10 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
         ga,
         result,
         before,
-        after: self.rankPoints + self.firstWinPoints,
-        delta: self.rankPoints + self.firstWinPoints - before,
+        after: self.rankPoints + self.firstWinPoints + self.participationPoints,
+        delta: self.rankPoints + self.firstWinPoints + self.participationPoints - before,
         firstWinBonus: bonus,
+        participationBonus,
         baseDelta: self.rankPoints - baseBefore,
       });
     }
@@ -375,17 +384,14 @@ export function analyzeSingles(s: SinglesLeague): SinglesStats[] {
     rankPoints:
       frozenFinal && archive.finalRatings[p.player.id]
         ? archive.finalRatings[p.player.id].rankPoints
-        : p.rankPoints + p.firstWinPoints,
+        : p.rankPoints + p.firstWinPoints + p.participationPoints,
     mmr:
       frozenFinal && archive.finalRatings[p.player.id]
         ? archive.finalRatings[p.player.id].mmr
         : p.mmr,
   }));
 }
-export function singlesFirstWinAwards(
-  s: SinglesLeague,
-): Record<string, number> {
-  if (s.seasonId === "beta") return {};
+function singlesRewardCandidates(s: SinglesLeague) {
   const known = new Set(s.players.map((p) => p.id));
   const candidates = s.matches
     .filter((m) => m.status === "finished")
@@ -400,17 +406,27 @@ export function singlesFirstWinAwards(
       const valid =
         m.homeId !== m.awayId &&
         known.has(m.homeId) &&
-        known.has(m.awayId) &&
-        a !== b;
+        known.has(m.awayId);
       return {
         id: m.id,
         time: m.time,
-        winners: valid
+        playerIds: valid ? [m.homeId, m.awayId] : [],
+        winnerIds: valid && a !== b ? [winner] : [],
+        winners: valid && a !== b
           ? [{ playerId: winner, position: "singles" as const }]
           : [],
       };
     });
-  return buildFirstWinAwards(candidates, s.firstWinPolicy);
+  return candidates;
+}
+export function singlesFirstWinAwards(s: SinglesLeague): Record<string, number> {
+  if (s.seasonId === "beta") return {};
+  return buildFirstWinAwards(singlesRewardCandidates(s), s.firstWinPolicy);
+}
+export function singlesParticipationAwards(s: SinglesLeague): Record<string, number> {
+  if (s.seasonId === "beta" || s.firstWinPolicy?.version !== FIRST_WIN_POLICY.version)
+    return {};
+  return buildParticipationAwards(singlesRewardCandidates(s), s.firstWinPolicy);
 }
 export function singlesForSeason(
   league: SinglesLeague,
@@ -422,6 +438,7 @@ export function singlesForSeason(
     seasonId: "beta",
     ratingSeeds: undefined,
     firstWinAwards: {},
+    participationAwards: {},
     settings: {
       ...(archive?.settings || league.settings),
       season: seasonName("beta"),
@@ -451,6 +468,7 @@ export function singlesForSeason(
       ),
   };
   next.firstWinAwards = singlesFirstWinAwards(next);
+  next.participationAwards = singlesParticipationAwards(next);
   return next;
 }
 

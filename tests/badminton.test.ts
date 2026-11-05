@@ -201,13 +201,14 @@ test("Elo starts at 1200; singles and doubles settle independently with identica
   const singles = analyzeBadminton(s, "singles"),
     doubles = analyzeBadminton(s, "doubles");
   assert.equal(singles.find((p) => p.player.id === "A")!.rankPoints, 1226);
-  assert.equal(singles.find((p) => p.player.id === "C")!.rankPoints, 1184);
+  assert.equal(singles.find((p) => p.player.id === "C")!.rankPoints, 1189);
+  assert.equal(singles.find((p) => p.player.id === "C")!.participationPoints, 5);
   assert.equal(singles.find((p) => p.player.id === "B")!.rankPoints, 1200);
   assert.equal(doubles.find((p) => p.player.id === "A")!.rankPoints, 1226);
   assert.equal(doubles.find((p) => p.player.id === "B")!.rankPoints, 1226);
   assert.equal(
     doubles.reduce((sum, p) => sum + p.rankPoints, 0),
-    4820,
+    4830,
   );
   assert.equal(badmintonPairs(s).length, 2);
 });

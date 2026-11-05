@@ -15,6 +15,7 @@ export type RankHistoryEntry = {
   after: number | null;
   delta: number | null;
   firstWinBonus?: number;
+  participationBonus?: number;
   baseDelta?: number | null;
 };
 
@@ -48,6 +49,7 @@ export function doublesRankHistory(
       ),
       firstWinBonus:
         (role === "overall" ? row.firstWinBonus : row.roleFirstWinBonus) || 0,
+      participationBonus: role === "overall" ? row.participationBonus || 0 : 0,
       baseDelta:
         (role === "overall" ? row.baseDelta : row.roleBaseDelta) ?? null,
     }))
@@ -69,6 +71,7 @@ export function singlesRankHistory(
       opponentIds: [row.opponentId],
       ...change(row.before, row.after),
       firstWinBonus: row.firstWinBonus || 0,
+      participationBonus: row.participationBonus || 0,
       baseDelta: row.baseDelta ?? null,
     }))
     .reverse();

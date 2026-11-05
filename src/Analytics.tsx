@@ -49,6 +49,7 @@ import type { League, Match, Player } from "../lib/league.ts";
 import { photoUrl } from "./api";
 import { RATING_BASE } from "../lib/rating.ts";
 import { RankLegend, RankScore } from "./RankScore";
+import { DailyRewardBreakdown } from "./DailyRewardBreakdown";
 import { doublesRankHistory } from "../lib/rank-history.ts";
 import { RankHistory } from "./RankHistory";
 
@@ -1249,13 +1250,12 @@ export function MatchRank({
                             className={`elo-number ${rating?.delta ? (rating.delta > 0 ? "positive" : "negative") : ""}`}
                           >
                             {rating ? signed(rating.delta, 0) : "—"}
-                            {(rating?.firstWinBonus || 0) > 0 && (
-                              <small className="first-win-breakdown">
-                                基础 {signed(rating?.baseDelta ?? null, 0)} ·{" "}
-                                {row.role === "forward" ? "前锋" : "后卫"}首胜 +
-                                {rating?.firstWinBonus}
-                              </small>
-                            )}
+                            <DailyRewardBreakdown
+                              baseDelta={rating?.baseDelta ?? null}
+                              firstWinBonus={rating?.firstWinBonus}
+                              participationBonus={rating?.participationBonus}
+                              firstWinLabel={row.role === "forward" ? "前锋首胜" : "后卫首胜"}
+                            />
                           </td>
                         </tr>
                       );
@@ -2392,14 +2392,14 @@ function Methods() {
           <h3>段位分</h3>
           <p>
             初始 {RATING_BASE} 分，最低 0
-            分，无定级赛。基础收益随赛前基础分（不含首胜奖励）平滑变化：1200
+            分，无定级赛。基础收益随赛前基础分（不含每日奖励）平滑变化：1200
             分胜 +32、负 −14，1300 分胜 +28、负 −18；1400 分起统一胜 +24、负
             −24，大师、宗师、王者不再额外增加扣分。战胜强队收益更高，负于弱队扣分更多；个人另有最多
             ±8 分的追赶修正。净胜球倍率为 1 + 0.5 × 分差 ÷ 胜方得分，0:0 时取
             1；最终乘倍率并四舍五入。胜场最低加 0 分，
             负场不会加分；钻石起平局不再固定加分。
             总段位分与位置段位分独立计算。完整记录四个位置的 2 对 2
-            完赛计分；筛选范围改变时从本赛季起始分重算。第一赛季每日前锋首胜、后卫首胜各额外加10分，总分每日最多加20；对应位置各加10。奖励独立叠加，不参与基础结算、净胜球倍率或实力估计。首胜资格按完整赛季与北京时间确定，切换筛选不会重新领取。
+            完赛计分；筛选范围改变时从本赛季起始分重算。第一赛季每日前锋首胜、后卫首胜各额外加10分，总分每日最多加20；对应位置各加10。当天有效参与但没有任何位置首胜，总段位分加5，位置段位不加参与分；当天取得任一首胜，参与分取消，只保留首胜奖励。每日奖励不参与基础结算、净胜球倍率或实力估计，资格按完整赛季与北京时间确定，切换筛选不会重新领取。
           </p>
         </div>
         <div>

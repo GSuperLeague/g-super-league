@@ -50,6 +50,7 @@ import type { BadmintonSnapshot } from "./badminton-api";
 import { photoUrl } from "./api";
 import { RankScore } from "./RankScore";
 import { LeagueAnnouncements } from "./LeagueAnnouncements";
+import { DailyRewardBreakdown } from "./DailyRewardBreakdown";
 import { ShuttleIcon } from "./GairHome";
 import "./badminton.css";
 import gbLeagueLogo from "./assets/gb-league-logo-640.png";
@@ -1672,12 +1673,12 @@ export default function Badminton({ route }: { route: string[] }) {
                                         }
                                       >
                                         {signed(h.delta)}
-                                        {h.firstWinBonus > 0 && (
-                                          <small className="gb-first-win-breakdown">
-                                            基础 {signed(h.baseDelta)} · 首胜 +
-                                            {h.firstWinBonus}
-                                          </small>
-                                        )}
+                                        <DailyRewardBreakdown
+                                          baseDelta={h.baseDelta}
+                                          firstWinBonus={h.firstWinBonus}
+                                          participationBonus={h.participationBonus}
+                                          className="gb-first-win-breakdown"
+                                        />
                                       </td>
                                     </tr>
                                   ) : null;
@@ -1774,7 +1775,7 @@ export default function Badminton({ route }: { route: string[] }) {
                       <h1>实力，一场场打出来。</h1>
                       <p>
                         {modeName(mode)}独立排名 · 初始1200分 ·
-                        胜负按双方赛前实力结算，另计本项目每日首胜 +10。
+                        每日参与 +5 或首胜 +10，按项目互斥计算。
                       </p>
                     </div>
                   </div>
@@ -1877,6 +1878,9 @@ export default function Badminton({ route }: { route: string[] }) {
                           <RankScore points={profile.rankPoints} showTier />
                           {profile.firstWinPoints > 0 && (
                             <small>已含首胜奖励 +{profile.firstWinPoints}</small>
+                          )}
+                          {profile.participationPoints > 0 && (
+                            <small>已含参与奖励 +{profile.participationPoints}</small>
                           )}
                           <small>
                             {profile.games
@@ -1981,12 +1985,12 @@ export default function Badminton({ route }: { route: string[] }) {
                                   <small>
                                     {h.before} → {h.after}
                                   </small>
-                                  {h.firstWinBonus > 0 && (
-                                    <small className="gb-first-win-breakdown">
-                                      基础 {signed(h.baseDelta)} · 首胜 +
-                                      {h.firstWinBonus}
-                                    </small>
-                                  )}
+                                  <DailyRewardBreakdown
+                                    baseDelta={h.baseDelta}
+                                    firstWinBonus={h.firstWinBonus}
+                                    participationBonus={h.participationBonus}
+                                    className="gb-first-win-breakdown"
+                                  />
                                 </span>
                                 <ChevronRight size={16} />
                               </button>
@@ -2203,7 +2207,7 @@ export default function Badminton({ route }: { route: string[] }) {
                       赛前预期胜率）。单打比较两人的基础段位，双打比较两位搭档的平均基础段位；同队的基础加减分相同，四舍五入到整数，基础段位最低0分。
                     </p>
                     <p>
-                      每日首胜从首场有效比赛开始补算，单打、双打各额外加10分，按北京时间每天00:00刷新资格，两个项目分别计算。同队两位球员各自判断首胜资格；奖励单独累加，不参与后续正常胜负加减分的计算。逐场记录会显示基础结算与首胜奖励。
+                      每日奖励从首场有效比赛开始补算，按北京时间00:00刷新资格，单打、双打分别计算。当日完成有效比赛但没有获胜，领取参与 +5；当日取得首胜则仅领取首胜 +10，参与分自动取消，不叠加成 +15。同队球员各自判断资格；每日奖励单独累加，不参与正常胜负加减分的计算，逐场记录显示奖励明细。
                     </p>
                     <p>
                       战胜更强的对手加分更多。比分只用于判断每局和整场胜负，不因多赢几分额外加成。修改、重新打开或删除历史比赛后，后续段位按比赛时间重新计算。
