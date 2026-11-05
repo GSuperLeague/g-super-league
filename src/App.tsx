@@ -862,9 +862,9 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                         G超 · 桌面足球超级联赛
                       </div>
                       <h2>
-                        {season === "s1" ? <>弹反<br /><span>几何</span></> : <>每一球，<br />都<span>算数。</span></>}
+                        {season === "s1" ? <>弹反<br /><span>赛季</span></> : <>每一球，<br />都<span>算数。</span></>}
                       </h2>
-                      <p>{season === "s1" ? "第一赛季 · 借对手来球的力量，弹回去。" : "属于我们的球场，属于每个人的高光。"}</p>
+                      <p>{season === "s1" ? "第一赛季正式进行中 · 借对手来球的力量，弹回去。" : "属于我们的球场，属于每个人的高光。"}</p>
                       <button
                         className="btn lime"
                         onClick={() =>

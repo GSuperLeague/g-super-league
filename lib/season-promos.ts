@@ -2,7 +2,7 @@ import { seasonName } from "./seasons.ts";
 import type { SeasonId } from "./seasons.ts";
 import type { NewsArticle } from "./news.ts";
 
-export const FOOTBALL_CURRENT_THEME = "弹反几何";
+export const FOOTBALL_CURRENT_THEME = "弹反赛季";
 export const FOOTBALL_NEXT_THEME = "爆冲流";
 
 export function footballSeasonLabel(season: SeasonId) {
@@ -26,13 +26,13 @@ export const footballSeasonPromos: SeasonPromo[] = [
     id: "s1",
     label: "第一赛季",
     theme: FOOTBALL_CURRENT_THEME,
-    status: "正在进行",
+    status: "正式进行中",
     description: "对手先出球，我方借来球的力量弹回去。",
     article: {
       id: "gsl-s1-parry-geometry-trailer",
-      title: `第一赛季：${FOOTBALL_CURRENT_THEME}｜赛季预告片`,
-      summary: `G超第一赛季主题「${FOOTBALL_CURRENT_THEME}」：对手先踢球，我方借来球的力量反弹回去。`,
-      body: `G超联赛第一赛季，主题是「${FOOTBALL_CURRENT_THEME}」。\n\n弹反，是对手先踢球后，我方借来球的力量，直接反弹回去。几何，是迎球的角度：让对手的来球，成为你的回击。\n\n预告片以“对手射门 → 我方迎球借力 → 弹回反击”展示这个过程。第一赛季正在进行。`,
+      title: `${FOOTBALL_CURRENT_THEME}正式进行中｜G超第一赛季`,
+      summary: `G超第一赛季「${FOOTBALL_CURRENT_THEME}」已于11月2日正式开赛：对手先踢球，我方借来球的力量反弹回去。`,
+      body: `G超联赛第一赛季「${FOOTBALL_CURRENT_THEME}」已于2026年11月2日正式开赛，目前正在进行中。\n\n弹反，是对手先踢球后，我方借来球的力量，直接反弹回去，让对手的来球成为你的回击。\n\n赛季短片以“对手射门 → 我方迎球借力 → 弹回反击”展示这个过程。欢迎进入比赛中心，查看本赛季的赛程、战绩与段位变化。`,
       season: "s1",
       publishedAt: "2026-11-05T06:45:05.000Z",
     },
