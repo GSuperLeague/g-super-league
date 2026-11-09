@@ -13,6 +13,11 @@ import {
 import type { SeasonId } from "./seasons.ts";
 import * as ratingV1 from "./rating-v1.ts";
 import {
+  doublesInitialUncertainty,
+  settleDoublesTrueSkill,
+  usesDoublesTrueSkill,
+} from "./rating-trueskill-v1.ts";
+import {
   RATING_BASE,
   expectedResult,
   marginMultiplier,
@@ -71,6 +76,7 @@ export type PlayerStats = {
   defender: Metrics;
   rankPoints: Record<Role, number>;
   mmr: Record<Role, number>;
+  ratingUncertainty?: Record<Role, number>;
   ratedGames: Record<Role, number>;
   firstWinPoints: Record<Role, number>;
   participationPoints: number;
@@ -258,6 +264,17 @@ export function analyzeLeague(league: League): Analytics {
       },
     ]),
   );
+  const ratingUncertainty = usesDoublesTrueSkill(league)
+    ? new Map(league.players.map((p) => {
+        const seed = league.ratingUncertaintySeeds?.[p.id];
+        const initial = doublesInitialUncertainty(0);
+        return [p.id, {
+          overall: seed?.overall ?? initial,
+          forward: seed?.forward ?? initial,
+          defender: seed?.defender ?? initial,
+        }];
+      }))
+    : undefined;
   const rankPoints = new Map(
     league.players.map((p) => [
       p.id,
@@ -308,7 +325,7 @@ export function analyzeLeague(league: League): Analytics {
       roles.every(
         (id, i) => histories.has(id) && rosters[i < 2 ? 0 : 1].includes(id),
       );
-    // Rate complete 2v2 results only. Team strength is the mean of both players' pre-match ratings.
+    // Only completed results with all four positions enter the rating replay.
     const rated = knownRoles && rosters.every((r) => r.length === 2);
     const preRankPoints = new Map(
       roles.map((id) => [id, { ...rankPoints.get(id)! }]),
@@ -326,40 +343,28 @@ export function analyzeLeague(league: League): Analytics {
           },
         ]),
     );
-    const deltas: { id: string; role: Role; value: number }[] = [];
     if (rated) {
       ratedMatches++;
       const homeResult =
         homeScore > awayScore ? 1 : homeScore < awayScore ? 0 : 0.5;
       const multiplier = margin(homeScore, awayScore);
       for (const mode of ["overall", "position"] as const) {
-        const before = roles.map(
-          (id, i) =>
-            ratings.get(id)![
-              mode === "overall"
-                ? "overall"
-                : i % 2 === 0
-                  ? "forward"
-                  : "defender"
-            ],
+        const tracks = roles.map<Role>((_, i) =>
+          mode === "overall" ? "overall" : i % 2 === 0 ? "forward" : "defender",
         );
-        const delta = changeMmr(
-          (before[0] + before[1]) / 2,
-          (before[2] + before[3]) / 2,
-          homeResult,
-          multiplier,
-        );
-        const homeExpected = expected(
-          (before[0] + before[1]) / 2,
-          (before[2] + before[3]) / 2,
-        );
+        const before = roles.map((id, i) => ratings.get(id)![tracks[i]]);
+        const updated = ratingUncertainty
+          ? settleDoublesTrueSkill(roles.map((id, i) => ({
+              mean: before[i],
+              uncertainty: ratingUncertainty.get(id)![tracks[i]],
+            })), homeResult)
+          : undefined;
+        const homeMean = (before[0] + before[1]) / 2;
+        const awayMean = (before[2] + before[3]) / 2;
+        const delta = updated ? 0 : changeMmr(homeMean, awayMean, homeResult, multiplier);
+        const homeExpected = updated?.homeExpected ?? expected(homeMean, awayMean);
         roles.forEach((id, i) => {
-          const role =
-            mode === "overall"
-              ? "overall"
-              : i % 2 === 0
-                ? "forward"
-                : "defender";
+          const role = tracks[i];
           const result =
             i < 2
               ? homeResult
@@ -375,16 +380,12 @@ export function analyzeLeague(league: League): Analytics {
             multiplier,
             i < 2 ? homeExpected : 1 - homeExpected,
           );
-          deltas.push({
-            id,
-            role,
-            value: i < 2 ? delta : -delta,
-          });
+          ratings.get(id)![role] = updated?.after[i].mean ?? before[i] + (i < 2 ? delta : -delta);
+          if (ratingUncertainty && updated) {
+            ratingUncertainty.get(id)![role] = updated.after[i].uncertainty;
+          }
+          ratedGames.get(id)![role]++;
         });
-      }
-      for (const { id, role, value } of deltas) {
-        ratings.get(id)![role] += value;
-        ratedGames.get(id)![role]++;
       }
       roles.forEach((id, i) => {
         const role = i % 2 === 0 ? "forward" : "defender";
@@ -519,6 +520,7 @@ export function analyzeLeague(league: League): Analytics {
                 defender: archive.finalRatings[player.id].defender.mmr,
               }
             : ratings.get(player.id)!,
+        ...(ratingUncertainty && { ratingUncertainty: ratingUncertainty.get(player.id)! }),
         ratedGames: ratedGames.get(player.id)!,
         firstWinPoints: bonusPoints.get(player.id)!,
         participationPoints: participationPoints.get(player.id)!,
@@ -581,6 +583,17 @@ export function leagueForSeason(league: League, season: SeasonId): League {
         ]),
       ),
   };
+  if (usesDoublesTrueSkill(next)) {
+    const betaGames = new Map(previous.players.map((p) => [p.player.id, p.ratedGames]));
+    next.ratingUncertaintySeeds = Object.fromEntries(next.players.map((player) => {
+      const games = betaGames.get(player.id);
+      return [player.id, {
+        overall: doublesInitialUncertainty(games?.overall ?? 0),
+        forward: doublesInitialUncertainty(games?.forward ?? 0),
+        defender: doublesInitialUncertainty(games?.defender ?? 0),
+      }];
+    }));
+  }
   next.firstWinAwards = doublesFirstWinAwards(next);
   next.participationAwards = doublesParticipationAwards(next);
   return next;

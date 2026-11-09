@@ -48,6 +48,7 @@ import {
 import type { League, Match, Player } from "../lib/league.ts";
 import { photoUrl } from "./api";
 import { RATING_BASE } from "../lib/rating.ts";
+import { DOUBLES_PROVISIONAL_THRESHOLD, usesDoublesTrueSkill } from "../lib/rating-trueskill-v1.ts";
 import { RankLegend, RankScore } from "./RankScore";
 import { DailyRewardBreakdown } from "./DailyRewardBreakdown";
 import { doublesRankHistory } from "../lib/rank-history.ts";
@@ -74,6 +75,24 @@ const teamsFor = (s: League, p: Player) =>
     .map((id) => s.teams.find((t) => t.id === id)?.name)
     .filter(Boolean)
     .join(" / ");
+
+function DoublesRankScore({
+  stats,
+  role = "overall",
+  showTier,
+}: {
+  stats: PlayerStats;
+  role?: Role;
+  showTier?: boolean;
+}) {
+  const provisional = (stats.ratingUncertainty?.[role] ?? 0) > DOUBLES_PROVISIONAL_THRESHOLD;
+  return (
+    <>
+      <RankScore points={stats.rankPoints[role]} showTier={showTier} />
+      {provisional && <span className="data-rating-provisional">定级中</span>}
+    </>
+  );
+}
 
 function Person({
   player,
@@ -187,7 +206,7 @@ export function RankLeaders({
             <Person player={p.player} />
             <div className="leader-rating">
               <strong>
-                <RankScore points={p.rankPoints.overall} />
+                <DoublesRankScore stats={p} />
               </strong>
               <small>
                 {p.overall.games
@@ -283,7 +302,7 @@ export function PlayerDirectory({
               <div className="directory-metrics">
                 <div>
                   <strong>
-                    <RankScore points={p.rankPoints[role]} />
+                    <DoublesRankScore stats={p} role={role} />
                   </strong>
                   <small>
                     {role === "overall" ? "总" : roleLabels[role]}段位分
@@ -488,7 +507,7 @@ export function PlayerProfile({
         items={[
           {
             label: `${role === "overall" ? "总" : roleLabels[role]}段位分`,
-            value: <RankScore points={stats.rankPoints[role]} showTier />,
+            value: <DoublesRankScore stats={stats} role={role} showTier />,
             sub: `${stats.ratedGames[role]} 场有效计分`,
             tone: "blue",
           },
@@ -601,7 +620,7 @@ export function PlayerProfile({
                   <td>{num(stats[r].avgAgainst)}</td>
                   <td>{signed(stats[r].avgDifference)}</td>
                   <td>
-                    <RankScore points={stats.rankPoints[r]} />
+                    <DoublesRankScore stats={stats} role={r} />
                   </td>
                 </tr>
               ))}
@@ -658,7 +677,7 @@ export function PlayerProfile({
           删除档案
         </button>
       </details>
-      <Methods />
+      <Methods trueSkill={usesDoublesTrueSkill(league)} />
     </div>
   );
 }
@@ -828,6 +847,7 @@ export function AnalyticsPage({
           <h1>赛场数据</h1>
           <p>
             {data.finished.length} 场完赛 · {data.ratedMatches} 场有效计分
+            {usesDoublesTrueSkill(league) && " · 实力＋可信度"}
           </p>
         </div>
         <span className="data-status">
@@ -1001,7 +1021,7 @@ export function AnalyticsPage({
           />
         )}
       </div>
-      <Methods />
+      <Methods trueSkill={usesDoublesTrueSkill(league)} />
     </div>
   );
 }
@@ -1784,7 +1804,7 @@ function PlayerRanking({
                 </td>
                 <td>
                   <b className="data-elo">
-                    <RankScore points={p.rankPoints[role]} />
+                    <DoublesRankScore stats={p} role={role} />
                   </b>
                 </td>
                 <td>
@@ -2293,7 +2313,7 @@ function Honors({
                   <ArrowUpRight size={15} />
                 </button>
                 <strong>
-                  <RankScore points={stats.rankPoints[role]} />
+                  <DoublesRankScore stats={stats} role={role} />
                   <small>
                     {sub} · {stats[role].games} 场
                   </small>
@@ -2351,7 +2371,7 @@ function Honors({
             <Person player={clubBest.player} />
             <span>
               <strong>
-                <RankScore points={clubBest.rankPoints.overall} />
+                <DoublesRankScore stats={clubBest} />
               </strong>
               <small>总段位分 · 当前成员个人赛果</small>
             </span>
@@ -2374,7 +2394,7 @@ function DataEmpty({ text }: { text: string }) {
   );
 }
 
-function Methods() {
+function Methods({ trueSkill }: { trueSkill: boolean }) {
   return (
     <details className="data-methods">
       <summary>
@@ -2391,8 +2411,10 @@ function Methods() {
         <div>
           <h3>段位分</h3>
           <p>
-            初始 {RATING_BASE} 分，最低 0
-            分，无定级赛。基础收益随赛前基础分（不含每日奖励）平滑变化：1200
+            {trueSkill
+              ? "双打采用实力＋可信度计分。隐藏分按胜、负或平局更新，同队球员按各自的不确定度调整。总分、前锋和后卫分别定级。净胜球倍率用于公开段位分。"
+              : `初始 ${RATING_BASE} 分，无定级赛。`}
+            公开段位分最低 0 分。基础收益随赛前基础分（不含每日奖励）平滑变化：1200
             分胜 +32、负 −14，1300 分胜 +28、负 −18；1400 分起统一胜 +24、负
             −24，大师、宗师、王者不再额外增加扣分。战胜强队收益更高，负于弱队扣分更多；个人另有最多
             ±8 分的追赶修正。净胜球倍率为 1 + 0.5 × 分差 ÷ 胜方得分，0:0 时取

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   analyzeLeague,
+  archiveBetaLeague,
   leagueForSeason,
   matchRatings,
 } from "../lib/analytics.ts";
@@ -16,6 +17,7 @@ import {
 } from "../lib/singles.ts";
 import { inheritRating, matchSeason, SEASON_START } from "../lib/seasons.ts";
 import { betaReport, leadHistory } from "../lib/season-news.ts";
+import { DOUBLES_TRUESKILL_POLICY, settleDoublesTrueSkill } from "../lib/rating-trueskill-v1.ts";
 
 function fixture(): League {
   let league = emptyLeague();
@@ -140,6 +142,47 @@ test("first-season match details begin at the inherited seeds, and Beta ignores 
     analyzeLeague(leagueForSeason(edited, "s1")).players,
     players,
   );
+});
+
+test("TrueSkill replays doubles from the season boundary with independent position uncertainty", () => {
+  const past = result(fixture(), "old", "2026-11-01T15:59:59Z");
+  const sealed = archiveBetaLeague(past, {
+    lockedAt: SEASON_START,
+    sourceRevision: 1,
+    sourceCommit: "test",
+  });
+  const before = analyzeLeague(leagueForSeason(sealed, "beta"));
+  const enabled = { ...sealed, doublesRatingPolicy: DOUBLES_TRUESKILL_POLICY };
+  const close = leagueForSeason(result(structuredClone(enabled), "close", SEASON_START, 7, 6), "s1");
+  const wide = leagueForSeason(result(structuredClone(enabled), "wide", SEASON_START, 7, 2), "s1");
+  const closePlayer = analyzeLeague(close).players[0];
+  const widePlayer = analyzeLeague(wide).players[0];
+  assert.deepEqual(analyzeLeague(leagueForSeason(enabled, "beta")), before);
+  assert.deepEqual(closePlayer.mmr, widePlayer.mmr);
+  assert.notEqual(closePlayer.rankPoints.overall, widePlayer.rankPoints.overall);
+  assert.ok(widePlayer.ratingUncertainty!.forward < wide.ratingUncertaintySeeds!.p1.forward);
+  assert.equal(widePlayer.ratingUncertainty!.defender, 180);
+  assert.equal(widePlayer.firstWinPoints.forward, 10);
+  assert.equal(matchRatings(wide, wide.matches[0]).players[0].overall.after, widePlayer.rankPoints.overall);
+  assert.equal(analyzeLeague(leagueForSeason(sealed, "s1")).players[0].ratingUncertainty, undefined);
+});
+
+test("a higher uncertainty gives a teammate more of the hidden rating correction", () => {
+  const before = [80, 180, 80, 80].map((uncertainty) => ({ mean: 1200, uncertainty }));
+  const { homeExpected, after } = settleDoublesTrueSkill(before, 0);
+  assert.equal(homeExpected, 0.5);
+  assert.ok(after[1].mean < after[0].mean && after[0].mean < 1200);
+  assert.ok(after[1].uncertainty < 180);
+  assert.equal(after[2].mean, after[3].mean);
+});
+
+test("draws pull different team estimates together and very unlikely wins stay finite", () => {
+  const before = [20_000, 20_000, 1200, 1200].map((mean) => ({ mean, uncertainty: 180 }));
+  const draw = settleDoublesTrueSkill(before, 0.5).after;
+  assert.ok(draw[0].mean < before[0].mean && draw[2].mean > before[2].mean);
+  const upset = settleDoublesTrueSkill(before, 0).after;
+  assert.ok(upset.every((rating) => Number.isFinite(rating.mean) && rating.uncertainty > 0));
+  assert.ok(upset[0].mean < before[0].mean && upset[2].mean > before[2].mean);
 });
 test("singles inherits its own Beta ratings without leaking old stats into new-season replay", () => {
   let singles = emptySinglesLeague();
