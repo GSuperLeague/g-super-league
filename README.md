@@ -34,9 +34,9 @@ GitHub Pages构建使用`VITE_BADMINTON_API_BASE_URL`（有默认GB服务地址�
 
 ### 联赛图库
 
-`#gallery/football` 与 `#gallery/badminton` 分别展示 G超和 GB 的照片。访客可一次选择最多六张，网页压缩后立即发布到对应图库。G超双打或 GB 的管理员登录后可以在大图中删除照片。
+`#gallery/football` 与 `#gallery/badminton` 分别展示 G超和 GB 的照片。列表加载缩略图，点开照片才加载大图。访客可一次上传最多六张 JPG、PNG 或 WebP 照片，单张原图最多 8 MB。新上传同时保存缩略图和原始文件。旧照片的大图使用之前保存的 JPEG。G超双打或 GB 的管理员登录后可以在大图中删除照片。
 
-上线图库前，在 GB 使用的 D1 中应用 `badminton-api/migrations/0002_gallery.sql`，再部署 GB Worker 和 GitHub Pages。本地 `scripts/gb-preview.mjs` 自动创建图库表。
+上线图库前，在 GB 使用的 D1 中按顺序应用 `badminton-api/migrations/0002_gallery.sql` 和 `0003_gallery_photo_variants.sql`，再部署 GB Worker 和 GitHub Pages。本地 `scripts/gb-preview.mjs` 自动应用图库迁移。
 
 以下为桌足联赛原有功能与部署说明。
 

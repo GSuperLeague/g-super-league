@@ -55,8 +55,10 @@ before(async () => {
     .prepare("INSERT INTO league VALUES (?,?,?)")
     .bind("main", '{"preserve":"football-data"}', 713)
     .run();
-  const gallery = await readFile("badminton-api/migrations/0002_gallery.sql", "utf8");
-  await db.batch(gallery.split(";").map((sql) => sql.trim()).filter(Boolean).map((sql) => db.prepare(sql)));
+  for (const migration of ["0002_gallery.sql", "0003_gallery_photo_variants.sql"]) {
+    const sql = await readFile(`badminton-api/migrations/${migration}`, "utf8");
+    await db.batch(sql.split(";").map((statement) => statement.trim()).filter(Boolean).map((statement) => db.prepare(statement)));
+  }
 });
 beforeEach(async () => {
   const db = await runtime.getD1Database("DB", "gb");
@@ -106,6 +108,36 @@ test("gallery uploads are bounded, idempotent, and separated by league", async (
   assert.equal((await gallery(`badminton/${photo.id}`)).status, 200);
   assert.deepEqual(await db.prepare("SELECT data,revision FROM badminton_league WHERE id='main'").first(), snapshot);
   assert.equal(await db.prepare("SELECT revision FROM league WHERE id='main'").first("revision"), 713);
+});
+test("gallery serves a small thumbnail and reconstructs the exact original on demand", async () => {
+  const db = await runtime.getD1Database("DB", "gb");
+  const thumbnail = await readFile("tests/fixtures/gallery.jpg");
+  const original = await readFile("src/assets/gb-league-logo.png");
+  const body = new FormData();
+  body.set("thumbnail", new Blob([thumbnail], { type: "image/jpeg" }), "thumb.jpg");
+  body.set("original", new Blob([original], { type: "image/png" }), "original.png");
+  const album = "https://league.example/api/gallery/football";
+  const multipart = new Request(album, { method: "POST", body });
+  const encoded = new Uint8Array(await multipart.arrayBuffer());
+  const contentType = multipart.headers.get("Content-Type");
+  assert(contentType);
+  const upload = () => runtime.dispatchFetch(album, {
+    method: "POST", headers: { Origin: "https://league.example", "Content-Type": contentType }, body: encoded,
+  });
+  const saved = await upload();
+  assert.equal(saved.status, 201, await saved.clone().text());
+  const photo = (await saved.json()) as GalleryPhoto;
+  assert.equal((await upload()).status, 200);
+  const small = await runtime.dispatchFetch(`${album}/${photo.id}/thumbnail`);
+  assert.equal(small.headers.get("Content-Type"), "image/jpeg");
+  assert.deepEqual(Buffer.from(await small.arrayBuffer()), thumbnail);
+  const full = await runtime.dispatchFetch(`${album}/${photo.id}`);
+  assert.equal(full.headers.get("Content-Type"), "image/png");
+  assert.deepEqual(Buffer.from(await full.arrayBuffer()), original);
+  assert.equal((await runtime.dispatchFetch(`${album}/${photo.id}`, {
+    method: "DELETE", headers: { Authorization: `Bearer ${key}` },
+  })).status, 204);
+  assert.equal(await db.prepare("SELECT COUNT(*) AS parts FROM gallery_original_parts WHERE id = ?").bind(photo.id).first("parts"), 0);
 });
 const post = (
   type: string,
