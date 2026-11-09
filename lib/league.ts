@@ -2,6 +2,7 @@ import type { RatingSeed, SeasonContext } from "./seasons.ts";
 import { assertSeasonWritable } from "./seasons.ts";
 import { applyNewsAction } from "./news.ts";
 import type { NewsArticle } from "./news.ts";
+import type { DoublesRatingPolicy } from "./rating-trueskill-v1.ts";
 export type Team = {id:string;name:string;short:string;color:string;bio:string};
 export const dimensions=['射门','传球','控球','防守','反应','配合'];
 export type Player = {id:string;name:string;nickname:string;teamIds?:string[];teamId?:string;number:number;position:string;value:number;bio:string;photo:string;skills:number[]};
@@ -16,7 +17,17 @@ export function matchTeam(teams:Team[],match:Match,id:string):Team|undefined{
  if(match.kind==='pickup'&&(id===match.homeId||id===match.awayId)){const home=id===match.homeId;return {id,name:home?'队伍A':'队伍B',short:home?'A':'B',color:home?'#365c49':'#275e9b',bio:'本场临时组队'}}
  return teams.find(t=>t.id===id);
 }
-export type League=SeasonContext<Record<'overall'|'forward'|'defender',RatingSeed>,Match,Player,Team>&{teams:Team[];players:Player[];matches:Match[];news?:NewsArticle[];settings:{season:string;win:number;draw:number;loss:number};updatedAt:string};
+export type League = SeasonContext<Record<'overall'|'forward'|'defender',RatingSeed>,Match,Player,Team> & {
+ teams: Team[];
+ players: Player[];
+ matches: Match[];
+ news?: NewsArticle[];
+ settings: {season:string;win:number;draw:number;loss:number};
+ updatedAt: string;
+ doublesRatingPolicy?: DoublesRatingPolicy;
+ // Derived from the sealed beta results, before applying UI filters.
+ ratingUncertaintySeeds?: Record<string, Record<'overall'|'forward'|'defender', number>>;
+};
 export const emptyLeague=():League=>({teams:[],players:[],matches:[],settings:{season:'2026 赛季',win:3,draw:1,loss:0},updatedAt:''});
 export function score(m:Match){if(m.summary)return [m.summary.homeScore,m.summary.awayScore];return [m.goals.filter(g=>g.teamId===m.homeId).length,m.goals.filter(g=>g.teamId===m.awayId).length]}
 export function standings(s:League){return s.teams.map(t=>{const r={...t,played:0,win:0,draw:0,loss:0,gf:0,ga:0,gd:0,points:0};s.matches.filter(m=>m.status==='finished'&&m.kind!=='pickup'&&(m.homeId===t.id||m.awayId===t.id)).forEach(m=>{const v=score(m);const a=m.homeId===t.id?v[0]:v[1],b=m.homeId===t.id?v[1]:v[0];r.played++;r.gf+=a;r.ga+=b;if(a>b)r.win++;else if(a===b)r.draw++;else r.loss++});r.gd=r.gf-r.ga;r.points=r.win*s.settings.win+r.draw*s.settings.draw+r.loss*s.settings.loss;return r}).sort((a,b)=>b.points-a.points||b.gd-a.gd||b.gf-a.gf||a.name.localeCompare(b.name,'zh'))}
