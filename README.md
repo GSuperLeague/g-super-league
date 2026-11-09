@@ -7,7 +7,7 @@ GAIR超级联赛统一入口，下设 **G超桌足联赛** 与 **GB羽毛球联�
 - GB默认 **11分、一局决胜，10平后须净胜两分**。11:10继续，12:10或16:14可完赛；不另设封顶分。每场可选择目标分和一局 / 三局两胜，平分后的加赛相应从目标分前一分开始。历史未启用加赛的比赛保持原规则。
 - 支持登记球员、从G超名单加入、安排赛程、逐分计分与撤销、确认完赛、赛后补录和修正、个人排行榜、双打搭档榜、球员逐场加减分、暂停 / 恢复球员登记、JSON导出。
 - GB单双打分别从1200分开始，用K=32、尺度400的Elo计分；双打按搭档平均分比较，双方按赛前值结算。只有确认完赛才计入排名；历史赛果修正后重放后续段位。桌足成绩不参与GB计算。
-- GB与桌足使用同一D1实例，但GB仅写独立的`badminton_league`表。原桌足Worker、`league`和`photos`保持原有职责。
+- GB与桌足双打使用同一D1实例。GB赛果保存在`badminton_league`表，图库照片保存在`gallery_photos`表。
 - 独立GB API部署目标：`https://gair-badminton-api.jason-brown-20-28-2023.workers.dev/api/badminton/league`。管理员验证通过服务绑定调用现有G超 `/api/auth`，不复制或暴露原管理密钥。
 - 名单导入仅沿用姓名、昵称、头像并保留来源球员ID，不复制比赛、球队、人工能力或段位分。导入后资料分别维护。
 
@@ -31,6 +31,12 @@ GB生产部署：在配置指定的Cloudflare账号下，先执行`badminton-api
 API提供`GET /api/badminton/league`、`POST /api/badminton/league`、`POST /api/badminton/auth`、`GET /api/badminton/source-players`。写入必须带现有管理员Bearer、`expectedRevision`与唯一`actionId`；冲突返回409，重试同一actionId不重复加分。公开GET不初始化或改写数据。CORS只允许配置来源；请求体最大32KB。
 
 GitHub Pages构建使用`VITE_BADMINTON_API_BASE_URL`（有默认GB服务地址），新增联赛不改变`VITE_API_BASE_URL`。GB API需先完成部署再发布前端。
+
+### 联赛图库
+
+`#gallery/football` 与 `#gallery/badminton` 分别展示 G超和 GB 的照片。访客可一次选择最多六张，网页压缩后立即发布到对应图库。G超双打或 GB 的管理员登录后可以在大图中删除照片。
+
+上线图库前，在 GB 使用的 D1 中应用 `badminton-api/migrations/0002_gallery.sql`，再部署 GB Worker 和 GitHub Pages。本地 `scripts/gb-preview.mjs` 自动创建图库表。
 
 以下为桌足联赛原有功能与部署说明。
 

@@ -7,6 +7,7 @@ import {
   Check,
   ChevronRight,
   Download,
+  Images,
   LayoutDashboard,
   LogIn,
   LogOut,
@@ -1073,6 +1074,9 @@ export default function Badminton({ route }: { route: string[] }) {
               {key === "matches" && live.length > 0 && <i>{live.length}</i>}
             </button>
           ))}
+          <a className="gb-gallery-link" href="#gallery/badminton">
+            <Images size={19} /> 联赛图库
+          </a>
         </nav>
         <div className="gb-side-bottom">
           <ShuttleIcon size={37} />
