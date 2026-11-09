@@ -36,7 +36,7 @@ const mf = new Miniflare({
           type: "ESModule",
           path: "entry.mjs",
           contents:
-            'import worker from "./gb.mjs"; export default {fetch(r,e,c){return new URL(r.url).pathname.startsWith("/api/badminton")?worker.fetch(r,e,c):e.AUTH_SERVICE.fetch(r);}}',
+            'import worker from "./gb.mjs"; export default {fetch(r,e,c){const p=new URL(r.url).pathname;return p.startsWith("/api/badminton/")||p.startsWith("/api/gallery/")?worker.fetch(r,e,c):e.AUTH_SERVICE.fetch(r);}}',
         },
         {
           type: "ESModule",
@@ -96,6 +96,8 @@ await gbDb
     "CREATE TABLE badminton_league (id TEXT PRIMARY KEY,data TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 0)",
   )
   .run();
+const gallerySql = await readFile("badminton-api/migrations/0002_gallery.sql", "utf8");
+await gbDb.batch(gallerySql.split(";").map((sql) => sql.trim()).filter(Boolean).map((sql) => gbDb.prepare(sql)));
 let gb = emptyBadmintonLeague();
 if (football.players.length)
   gb = applyBadmintonAction(gb, {

@@ -15,6 +15,12 @@
 @media(max-width:360px){.gair-welcome h1{font-size:30px;letter-spacing:-1.4px;white-space:nowrap}.gair-welcome h1>span{font-size:25px;letter-spacing:.5px}}
 
 .gair-card-caption{font-size:10px;color:#8b9b77}
+.gair-header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:520px){.gair-header:has(.gair-header-actions){gap:10px}.gair-header-actions{gap:3px 9px}.gair-header-actions .gair-nav-link{white-space:nowrap}}
+.gb-navigation .gb-gallery-link{display:flex;align-items:center;gap:12px;padding:14px;border-radius:7px;color:#a3b79a;font-size:13px;text-decoration:none}
+.gb-navigation .gb-gallery-link:hover{background:#334b35;color:#e0eccf}
+@media(max-width:1000px){.gb-navigation .gb-gallery-link{padding:12px 10px;gap:9px;font-size:11px}}
+@media(max-width:760px){.gb-navigation .gb-gallery-link{flex-shrink:0;padding:10px 11px;gap:6px;font-size:10px;border-radius:5px}}
 
 .gair-league-card {
   isolation: isolate;

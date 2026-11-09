@@ -1,8 +1,10 @@
 import { test, before, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { buildSync } from "esbuild";
 import { Miniflare } from "miniflare";
 import { emptyBadmintonLeague } from "../lib/badminton.ts";
+import { GALLERY_MAX_BYTES, type GalleryPage, type GalleryPhoto } from "../lib/gallery.ts";
 
 let runtime: Miniflare;
 let serial = 0;
@@ -53,6 +55,8 @@ before(async () => {
     .prepare("INSERT INTO league VALUES (?,?,?)")
     .bind("main", '{"preserve":"football-data"}', 713)
     .run();
+  const gallery = await readFile("badminton-api/migrations/0002_gallery.sql", "utf8");
+  await db.batch(gallery.split(";").map((sql) => sql.trim()).filter(Boolean).map((sql) => db.prepare(sql)));
 });
 beforeEach(async () => {
   const db = await runtime.getD1Database("DB", "gb");
@@ -69,6 +73,40 @@ const call = (
   path: string,
   init: NonNullable<Parameters<Miniflare["dispatchFetch"]>[1]> = {},
 ) => runtime.dispatchFetch(`https://league.example/api/badminton${path}`, init);
+test("gallery uploads are bounded, idempotent, and separated by league", async () => {
+  const db = await runtime.getD1Database("DB", "gb");
+  const jpeg = await readFile("tests/fixtures/gallery.jpg");
+  const gallery = (path: string, init?: Parameters<Miniflare["dispatchFetch"]>[1]) =>
+    runtime.dispatchFetch(`https://league.example/api/gallery/${path}`, init);
+  const upload = (league: string, body: Uint8Array = jpeg, origin = "https://league.example") =>
+    gallery(league, { method: "POST", headers: { Origin: origin, "Content-Type": "image/jpeg" }, body });
+  const snapshot = await db.prepare("SELECT data,revision FROM badminton_league WHERE id='main'").first();
+  assert.equal((await upload("football", jpeg, "https://other.example")).status, 403);
+  assert.equal((await upload("football", new Uint8Array(GALLERY_MAX_BYTES + 1))).status, 413);
+  assert.equal((await upload("football", new TextEncoder().encode("not a jpeg"))).status, 415);
+
+  const uploads = await Promise.all([upload("football"), upload("football")]);
+  assert.deepEqual(uploads.map((response) => response.status).sort(), [200, 201]);
+  const photo = (await uploads[0].json()) as GalleryPhoto;
+  assert.deepEqual(await uploads[1].json(), photo);
+  const football = (await (await gallery("football")).json()) as GalleryPage;
+  assert.deepEqual(football.photos, [photo]);
+  assert.equal((await gallery(`badminton/${photo.id}`)).status, 404);
+  assert.equal((await upload("badminton")).status, 201);
+  const stored = await gallery(`football/${photo.id}`);
+  assert.equal(stored.headers.get("Content-Type"), "image/jpeg");
+  assert.deepEqual(Buffer.from(await stored.arrayBuffer()), jpeg);
+
+  assert.equal((await gallery(`football/${photo.id}`, { method: "DELETE" })).status, 401);
+  const removed = await gallery(`football/${photo.id}`, {
+    method: "DELETE", headers: { Authorization: `Bearer ${key}` },
+  });
+  assert.equal(removed.status, 204);
+  assert.equal((await gallery(`football/${photo.id}`)).status, 404);
+  assert.equal((await gallery(`badminton/${photo.id}`)).status, 200);
+  assert.deepEqual(await db.prepare("SELECT data,revision FROM badminton_league WHERE id='main'").first(), snapshot);
+  assert.equal(await db.prepare("SELECT revision FROM league WHERE id='main'").first("revision"), 713);
+});
 const post = (
   type: string,
   id: string,

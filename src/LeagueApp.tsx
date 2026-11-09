@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { ArrowLeft, ArrowUpRight, UserRound, Users } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Images, UserRound, Users } from "lucide-react";
 import Doubles from "./App";
 import Singles from "./Singles";
 import "./gair.css";
@@ -9,6 +9,7 @@ import "./gb-logo.css";
 import "./g-super-logo.css";
 const GairHome = lazy(() => import("./GairHome"));
 const Badminton = lazy(() => import("./Badminton"));
+const Gallery = lazy(() => import("./Gallery"));
 
 function initialRoute() {
   if (window.location.hash) return window.location.hash;
@@ -24,29 +25,32 @@ export default function LeagueApp() {
   const parts = route.replace(/^#/, "").split("/");
   const mode = parts[0] === "singles" ? "singles" : "doubles";
   const isBadminton = parts[0] === "badminton";
-  const isHome = !["doubles", "singles", "badminton"].includes(parts[0]);
+  const isGallery = parts[0] === "gallery";
+  const isHome = !["doubles", "singles", "badminton", "gallery"].includes(parts[0]);
   useEffect(() => {
-    document.title = isHome
-      ? "GAIR超级联赛"
-      : isBadminton
-        ? "GB羽毛球联赛 · GAIR超级联赛"
-        : "G超桌足联赛 · GAIR超级联赛";
+    document.title = isGallery
+      ? "联赛图库 · GAIR超级联赛"
+      : isHome
+        ? "GAIR超级联赛"
+        : isBadminton
+          ? "GB羽毛球联赛 · GAIR超级联赛"
+          : "G超桌足联赛 · GAIR超级联赛";
     const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (favicon) {
       favicon.href = isBadminton
         ? gbLeagueFavicon
-        : isHome
+        : isHome || isGallery
           ? `${import.meta.env.BASE_URL}favicon.svg`
           : gSuperLeagueFavicon;
-      favicon.type = isHome ? "image/svg+xml" : "image/png";
+      favicon.type = isHome || isGallery ? "image/svg+xml" : "image/png";
     }
-  }, [isHome, isBadminton]);
+  }, [isHome, isBadminton, isGallery]);
   useEffect(() => {
-    if (isHome || isBadminton) return;
+    if (isHome || isBadminton || isGallery) return;
     try {
       localStorage.setItem("g-super-league:mode", mode);
     } catch {}
-  }, [mode, isHome, isBadminton]);
+  }, [mode, isHome, isBadminton, isGallery]);
   const switcher = (
     <div className="gair-football-switch">
       <a className="gair-parent-link" href="#home">
@@ -71,8 +75,17 @@ export default function LeagueApp() {
       <a className="gair-other-sport" href="#badminton">
         GB 羽毛球联赛 <ArrowUpRight size={13} />
       </a>
+      <a className="gair-other-sport" href="#gallery/football">
+        联赛图库 <Images size={13} />
+      </a>
     </div>
   );
+  if (isGallery)
+    return (
+      <Suspense fallback={<div className="gair-loading">正在打开联赛图库…</div>}>
+        <Gallery league={parts[1] === "badminton" ? "badminton" : "football"} />
+      </Suspense>
+    );
   if (isHome)
     return (
       <Suspense

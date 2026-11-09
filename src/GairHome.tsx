@@ -5,6 +5,7 @@ import {
   Users,
   Trophy,
   Activity,
+  Images,
 } from "lucide-react";
 import { apiBase } from "./api";
 import { badmintonApiBase } from "./badminton-api";
@@ -125,9 +126,14 @@ export default function GairHome() {
         <div className="gair-header-note">
           <i /> 为热爱，打出下一场。
         </div>
-        <a className="gair-nav-link" href="#badminton">
-          进入 GB 联赛 <ArrowUpRight size={16} />
-        </a>
+        <nav className="gair-header-actions" aria-label="联赛入口">
+          <a className="gair-nav-link" href="#gallery/football">
+            联赛图库 <Images size={16} />
+          </a>
+          <a className="gair-nav-link" href="#badminton">
+            进入 GB 联赛 <ArrowUpRight size={16} />
+          </a>
+        </nav>
       </header>
       <div className="gair-home-content">
         <section className="gair-welcome">

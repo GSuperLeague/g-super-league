@@ -1,6 +1,6 @@
 import { bindings, defineConfig } from "cf/config";
 
-// The badminton service only writes badminton_league. The table-football Worker
+// Badminton and gallery writes use their own tables. The table-football Worker
 // remains the authority for its own data and for administrator authentication.
 export default defineConfig({
   accountId:

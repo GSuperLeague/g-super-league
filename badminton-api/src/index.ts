@@ -5,6 +5,7 @@ import {
 import type { BadmintonAction, BadmintonLeague } from "../../lib/badminton.ts";
 import type { InferEnv } from "cf/config";
 import type config from "../cloudflare.config.ts";
+import { handleGallery } from "./gallery.ts";
 type GBEnv = InferEnv<typeof config.worker>;
 
 const json = (body: unknown, status = 200) =>
@@ -201,28 +202,32 @@ export default {
       allowed = env.ALLOWED_ORIGINS.split(",").map((x) => x.trim());
     if (origin && !allowed.includes(origin))
       return json({ error: "当前网站来源未获允许" }, 403);
+    const path = new URL(request.url).pathname;
+    const gallery = path.startsWith("/api/gallery/");
     let response: Response;
     try {
       response =
         request.method === "OPTIONS"
           ? new Response(null, { status: 204 })
-          : await handleBadminton(request, env);
+          : gallery
+            ? await handleGallery(request, env.DB, () => administrator(request, env))
+            : await handleBadminton(request, env);
     } catch (e) {
       console.error(
         JSON.stringify({
-          message: "GB request failed",
-          path: new URL(request.url).pathname,
+          message: gallery ? "Gallery request failed" : "GB request failed",
+          path,
           error: e instanceof Error ? e.message : "unknown",
         }),
       );
-      response = json({ error: "GB 联赛暂时无法连接，请稍后重试" }, 503);
+      response = json({ error: gallery ? "图库暂时无法连接，请稍后重试" : "GB 联赛暂时无法连接，请稍后重试" }, 503);
     }
     const headers = new Headers(response.headers);
     headers.set("Vary", "Origin");
     headers.set("X-Content-Type-Options", "nosniff");
     if (origin) {
       headers.set("Access-Control-Allow-Origin", origin);
-      headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      headers.set("Access-Control-Allow-Methods", gallery ? "GET, POST, DELETE, OPTIONS" : "GET, POST, OPTIONS");
       headers.set(
         "Access-Control-Allow-Headers",
         "Content-Type, Authorization",
