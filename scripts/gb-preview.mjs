@@ -96,8 +96,10 @@ await gbDb
     "CREATE TABLE badminton_league (id TEXT PRIMARY KEY,data TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 0)",
   )
   .run();
-const gallerySql = await readFile("badminton-api/migrations/0002_gallery.sql", "utf8");
-await gbDb.batch(gallerySql.split(";").map((sql) => sql.trim()).filter(Boolean).map((sql) => gbDb.prepare(sql)));
+for (const migration of ["0002_gallery.sql", "0003_gallery_photo_variants.sql"]) {
+  const sql = await readFile(`badminton-api/migrations/${migration}`, "utf8");
+  await gbDb.batch(sql.split(";").map((statement) => statement.trim()).filter(Boolean).map((statement) => gbDb.prepare(statement)));
+}
 let gb = emptyBadmintonLeague();
 if (football.players.length)
   gb = applyBadmintonAction(gb, {

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowLeft, Camera, ImagePlus, Images, Maximize2, X } from "lucide-react";
 import {
-  GALLERY_MAX_BYTES,
-  GALLERY_MAX_DIMENSION,
+  GALLERY_ORIGINAL_MAX_BYTES,
+  GALLERY_THUMB_MAX_BYTES,
+  GALLERY_THUMB_MAX_DIMENSION,
   type GalleryLeague,
   type GalleryPage,
   type GalleryPhoto,
@@ -20,6 +21,7 @@ const leagues = {
 const maxBatch = 6;
 const albumUrl = (league: GalleryLeague) => `${badmintonApiBase}/api/gallery/${league}`;
 const photoUrl = (league: GalleryLeague, photo: GalleryPhoto) => `${albumUrl(league)}/${photo.id}`;
+const thumbnailUrl = (league: GalleryLeague, photo: GalleryPhoto) => `${photoUrl(league, photo)}/thumbnail`;
 const formatDate = new Intl.DateTimeFormat("zh-CN", {
   year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Shanghai",
 });
@@ -33,8 +35,8 @@ async function request(url: string, init: RequestInit = {}) {
   return response;
 }
 
-async function compress(file: File): Promise<Blob> {
-  if (file.size > 25_000_000) throw new Error("原图超过 25 MB，请先缩小后再上传");
+async function makeThumbnail(file: File): Promise<Blob> {
+  if (file.size > GALLERY_ORIGINAL_MAX_BYTES) throw new Error("原图超过 8 MB，请换一张试试");
   const url = URL.createObjectURL(file);
   try {
     const image = new Image();
@@ -42,7 +44,7 @@ async function compress(file: File): Promise<Blob> {
     await image.decode().catch(() => {
       throw new Error("无法打开这张照片，请试试 JPG、PNG 或 WebP 格式");
     });
-    const scale = Math.min(1, GALLERY_MAX_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
+    const scale = Math.min(1, GALLERY_THUMB_MAX_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
     canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
@@ -53,9 +55,9 @@ async function compress(file: File): Promise<Blob> {
     ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
     for (const quality of [0.88, 0.76, 0.64, 0.52, 0.4, 0.3]) {
       const jpeg = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-      if (jpeg?.type === "image/jpeg" && jpeg.size <= GALLERY_MAX_BYTES) return jpeg;
+      if (jpeg?.type === "image/jpeg" && jpeg.size <= GALLERY_THUMB_MAX_BYTES) return jpeg;
     }
-    throw new Error("照片压缩后仍超过 600 KB，请换一张试试");
+    throw new Error("缩略图生成失败，请换一张试试");
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -88,9 +90,11 @@ function UploadDialog({ league, close, published }: {
     for (let i = 0; i < files.length; i++) {
       setProgress(i + 1);
       try {
-        const body = await compress(files[i]);
+        const body = new FormData();
+        body.set("thumbnail", await makeThumbnail(files[i]), "thumbnail.jpg");
+        body.set("original", files[i]);
         const response = await request(albumUrl(target), {
-          method: "POST", headers: { "Content-Type": "image/jpeg" }, body, signal: controller.signal,
+          method: "POST", body, signal: controller.signal,
         });
         const photo = await response.json() as GalleryPhoto;
         if (!photo.id) throw new Error("服务器未确认照片已保存，请重试");
@@ -126,7 +130,7 @@ function UploadDialog({ league, close, published }: {
           </select>
         </label>
         <label className="gallery-field">选择照片
-          <input type="file" accept="image/*" multiple disabled={progress !== null}
+          <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={progress !== null}
             onChange={(event) => {
               const chosen = Array.from(event.target.files ?? []);
               event.target.value = "";
@@ -143,7 +147,7 @@ function UploadDialog({ league, close, published }: {
         {files.length > 0 && <ul className="gallery-file-list" aria-label="已选照片">
           {files.map((file, i) => <li key={i}>{file.name}</li>)}
         </ul>}
-        <p className="gallery-hint">一次最多 {maxBatch} 张。照片会自动压缩，并公开显示在选定的图库中。</p>
+        <p className="gallery-hint">一次最多 {maxBatch} 张，单张原图最多 8 MB。照片会公开显示在选定的图库中。</p>
         {error && <p className="gallery-error" role="alert">{error}</p>}
         <button className="gallery-primary" type="submit" disabled={!files.length || progress !== null}>
           <ImagePlus size={18} />{progress === null ? "上传到图库" : `正在上传 ${progress} / ${files.length}`}
@@ -159,6 +163,7 @@ function PhotoDialog({ league, photo, close, removed }: {
   const dialog = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [imageState, setImageState] = useState<"loading" | "ready" | "error">("loading");
   const token = adminToken() || badmintonToken();
   useEffect(() => { if (!dialog.current?.open) dialog.current?.showModal(); }, []);
   async function remove() {
@@ -181,7 +186,14 @@ function PhotoDialog({ league, photo, close, removed }: {
           <b>{leagues[league].name}</b>
           <button className="gallery-icon-button" aria-label="关闭照片" onClick={() => dialog.current?.close()}><X size={21} /></button>
         </div>
-        <img src={photoUrl(league, photo)} alt={`${leagues[league].name}照片`} />
+        <div className="gallery-photo-stage">
+          {imageState !== "ready" && <img src={thumbnailUrl(league, photo)} alt="" />}
+          {imageState !== "error" && <img src={photoUrl(league, photo)} alt={`${leagues[league].name}照片`}
+            className={imageState === "loading" ? "gallery-original-pending" : undefined}
+            onLoad={() => setImageState("ready")} onError={() => setImageState("error")} />}
+        </div>
+        {imageState === "loading" && <p className="gallery-hint" role="status">正在加载大图…</p>}
+        {imageState === "error" && <p className="gallery-error" role="alert">大图加载失败，请关闭后重新打开。</p>}
         <footer><time dateTime={new Date(photo.createdAt).toISOString()}>{formatDate.format(photo.createdAt)}上传</time>
           {token && <button className="gallery-delete" onClick={() => void remove()} disabled={deleting}>删除照片</button>}
         </footer>
@@ -235,7 +247,7 @@ function Album({ league, upload }: { league: GalleryLeague; upload: () => void }
       {page && page.photos.length > 0 && <div className="gallery-grid">
         {page.photos.map((photo) => <figure key={photo.id} className="gallery-card">
           <button aria-label={`查看 ${formatDate.format(photo.createdAt)}上传的照片`} onClick={() => setSelected(photo)}>
-            <img src={photoUrl(league, photo)} alt={`${leagues[league].name}照片`} loading="lazy" decoding="async" />
+            <img src={thumbnailUrl(league, photo)} alt={`${leagues[league].name}照片`} loading="lazy" decoding="async" />
             <span className="gallery-enlarge"><Maximize2 size={16} /></span>
           </button>
           <figcaption><time dateTime={new Date(photo.createdAt).toISOString()}>{formatDate.format(photo.createdAt)}</time></figcaption>

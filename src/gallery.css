@@ -142,7 +142,9 @@
 .gallery-error { color: #842e27; }
 .gallery-photo-dialog { width: min(1080px, calc(100% - 28px)); }
 .gallery-photo-body { display: grid; gap: 12px; padding: 15px; }
-.gallery-photo-body > img { display: block; width: 100%; max-height: calc(100dvh - 180px); border-radius: 8px; background: #eff3eb; object-fit: contain; }
+.gallery-photo-stage { position: relative; }
+.gallery-photo-stage > img { display: block; width: 100%; max-height: calc(100dvh - 180px); border-radius: 8px; background: #eff3eb; object-fit: contain; }
+.gallery-photo-stage > .gallery-original-pending { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
 .gallery-photo-body > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #536850; font-size: 13px; }
 .gallery-delete { border: 1px solid #eed3ce; border-radius: 7px; padding: 8px 11px; color: #842e27; background: #fff5f3; cursor: pointer; }
 .league-gallery :focus-visible { outline: 2px solid #547a3b; outline-offset: 3px; }
