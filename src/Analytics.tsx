@@ -46,6 +46,7 @@ import {
   scorers,
 } from "../lib/league.ts";
 import type { League, Match, Player } from "../lib/league.ts";
+import { playerPosition } from "../lib/player-positions.ts";
 import { photoUrl } from "./api";
 import { RATING_BASE } from "../lib/rating.ts";
 import { DOUBLES_PROVISIONAL_THRESHOLD, usesDoublesTrueSkill } from "../lib/rating-trueskill-v1.ts";
@@ -113,7 +114,7 @@ function Person({
       <span>
         <b>{player.name}</b>
         <small>
-          #{String(player.number).padStart(2, "0")} · {player.position}
+          #{String(player.number).padStart(2, "0")} · {playerPosition(player)}
         </small>
       </span>
     </span>
@@ -327,7 +328,7 @@ export function PlayerDirectory({
               <Form stats={p} />
             </button>
             <div className="data-player-actions">
-              <span>{p.player.nickname || p.player.position}</span>
+              <span>{p.player.nickname || playerPosition(p.player)}</span>
               <button
                 className="icon-btn"
                 title="编辑球员资料"
@@ -489,7 +490,9 @@ export function PlayerProfile({
             <Sample games={stats.overall.games} />
           </h1>
           <p>
-            {teamsFor(league, player)} · {player.nickname || player.position}
+            {[teamsFor(league, player), playerPosition(player), player.nickname]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         </div>
         <button className="btn secondary" onClick={onEdit}>

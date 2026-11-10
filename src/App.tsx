@@ -7,6 +7,7 @@ import {
   MatchRank,
 } from "./Analytics";
 import { leagueForSeason } from "../lib/analytics.ts";
+import { playerPosition, playerPositionOptions } from "../lib/player-positions.ts";
 import { matchSeason, assertSeasonWritable } from "../lib/seasons.ts";
 import { ScoringNotice } from "./ScoringNotice";
 import { SeasonTrailers } from "./SeasonTrailers";
@@ -1677,7 +1678,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                                         matchRoles(current)!.awayForwardId
                                       ? "本场前锋"
                                       : "本场后卫"
-                                    : p.position}
+                                    : playerPosition(p)}
                                 </span>
                                 <small>#{p.number}</small>
                               </button>
@@ -2180,6 +2181,8 @@ function PlayerForm({
   onSave: (d: any) => void;
   onError: (m: string) => void;
 }) {
+  const position = initial ? playerPosition(initial) : "全能型";
+  const positions = [...new Set([position, ...playerPositionOptions])];
   const [teamIds, setTeamIds] = useState<string[]>(
     initial ? playerTeamIds(initial) : teams[0] ? [teams[0].id] : [],
   );
@@ -2335,9 +2338,9 @@ function PlayerForm({
           />
         </label>
         <label>
-          场上位置
-          <select name="position" defaultValue={initial?.position || "全能型"}>
-            {["前锋", "后卫", "守门员", "全能型"].map((p) => (
+          球员定位
+          <select name="position" defaultValue={position}>
+            {positions.map((p) => (
               <option key={p}>{p}</option>
             ))}
           </select>
