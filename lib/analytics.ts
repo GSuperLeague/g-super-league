@@ -67,6 +67,7 @@ export type Metrics = {
   deviation: number | null;
   longestStreak: number;
   currentStreak: number;
+  longestLosingStreak: number;
 };
 export type PlayerStats = {
   player: Player;
@@ -139,9 +140,13 @@ export function summarize(
     : 0;
   let longestStreak = 0,
     currentStreak = 0;
+  let longestLosingStreak = 0,
+    losingStreak = 0;
   for (const row of rows) {
     currentStreak = row.result === "W" ? currentStreak + 1 : 0;
     longestStreak = Math.max(longestStreak, currentStreak);
+    losingStreak = row.result === "L" ? losingStreak + 1 : 0;
+    longestLosingStreak = Math.max(longestLosingStreak, losingStreak);
   }
   return {
     games,
@@ -173,6 +178,7 @@ export function summarize(
         : null,
     longestStreak,
     currentStreak,
+    longestLosingStreak,
   };
 }
 
