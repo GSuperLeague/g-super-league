@@ -574,6 +574,7 @@ export function PlayerProfile({
                 "最长连胜 / 当前连胜",
                 `${m.longestStreak} / ${m.currentStreak}`,
               ],
+              ["最长连败", `${m.longestLosingStreak} 场`],
               ["净胜球标准差", num(m.deviation)],
             ].map(([label, value]) => (
               <div key={label}>
@@ -1784,6 +1785,7 @@ function PlayerRanking({
               <th>场均净胜</th>
               <th>关键局胜率</th>
               <th>最长连胜</th>
+              <th>最长连败</th>
               <th>近 10 场 · 总体</th>
             </tr>
           </thead>
@@ -1837,6 +1839,7 @@ function PlayerRanking({
                   </small>
                 </td>
                 <td>{p[role].longestStreak}</td>
+                <td>{p[role].longestLosingStreak}</td>
                 <td>
                   <Form stats={p} />
                 </td>

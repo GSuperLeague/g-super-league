@@ -310,6 +310,7 @@ test("scheduled/live games are excluded, streaks break at draws, and no-sample r
   league.matches[0].status = "live";
   const stats = analyzeLeague(league).players[0];
   assert.equal(stats.overall.games, 0);
+  assert.equal(stats.overall.longestLosingStreak, 0);
   assert.ok(radarAxes(stats, "overall").every((a) => a.value === null));
   assert.ok(radarAxes(stats, "forward").every((a) => a.value === null));
   const summary = summarize([
@@ -322,6 +323,12 @@ test("scheduled/live games are excluded, streaks break at draws, and no-sample r
   assert.equal(summary.currentStreak, 1);
   assert.equal(summary.closeGames, 3);
   assert.equal(summary.closeWinRate, 2 / 3);
+
+  const loss = { gf: 5, ga: 7, result: "L" } as const;
+  const draw = { gf: 3, ga: 3, result: "D" } as const;
+  const win = { gf: 7, ga: 5, result: "W" } as const;
+  const losingRuns = summarize([loss, loss, draw, loss, loss, win, loss, loss, loss]);
+  assert.equal(losingRuns.longestLosingStreak, 3);
 });
 
 test("role changes use historical records and detailed team encounters honor home/away orientation", () => {
