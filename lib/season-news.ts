@@ -1,11 +1,12 @@
 import { analyzeLeague, leagueForSeason } from "./analytics.ts";
-import type { PlayerStats, Role } from "./analytics.ts";
+import type { Metrics, PlayerStats, Role } from "./analytics.ts";
 import { score } from "./league.ts";
 import type { League, Match } from "./league.ts";
 import type { NewsArticle } from "./news.ts";
 import { rankTier } from "./rating.ts";
 import { buildMatchStories, recordedMatchFlow } from "./match-stories.ts";
 import type { MatchStory } from "./match-stories.ts";
+import type { SeasonTitle } from "./season-one-titles.ts";
 
 export type SeasonAward = {
   id: string;
@@ -15,6 +16,7 @@ export type SeasonAward = {
   story: string;
   evidence: string;
   matchIds: string[];
+  category?: string;
 };
 type PlayerByline = { surname: string; nickname: string; givenName: string };
 export type RankingStory = {
@@ -22,21 +24,39 @@ export type RankingStory = {
   byline: PlayerByline | null;
   verse: string;
   body: string;
+  distinction?: string;
+  facts?: { label: string; value: string }[];
 };
 const betaBylines: Record<string, PlayerByline> = {
   余俊洁: { surname: "Yu", nickname: "Augety", givenName: "Junjie" },
   雷可洋: { surname: "Lei", nickname: "Cyanide", givenName: "Keyang" },
   胡竹霖: { surname: "Hu", nickname: "Kenny", givenName: "Zhulin" },
 };
-export type BetaReport = {
+export type SeasonReport = {
   article: NewsArticle;
-  top3: PlayerStats[];
+  top3: {
+    player: Pick<PlayerStats["player"], "id" | "name" | "nickname">;
+    rankPoints: Record<Role, number>;
+    overall: Pick<Metrics, "games" | "wins" | "draws" | "losses" | "winRate" | "longestStreak">;
+  }[];
   rankingStories: RankingStory[];
   awards: SeasonAward[];
   highlights: MatchStory[];
   finished: number;
   detailed: number;
+  seasonLabel?: string;
+  titleEdition?: { label: string; note: string; players: readonly SeasonTitle[] };
+  closingTitle?: string;
+  methodology?: string;
+  numbers?: { label: string; value: string }[];
+  recordBook?: {
+    entries: { label: string; value: string; name: string; note: string; matchId: string }[];
+    days: { date: string; name: string; points: number }[];
+    note: string;
+  };
+  rookies?: { name: string; debut: string; record: string; title: string; body: string }[];
 };
+export type BetaReport = SeasonReport;
 
 // Goal array order is the recorded scoring sequence; summary-only games have no lead history.
 export function leadHistory(

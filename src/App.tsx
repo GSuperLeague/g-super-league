@@ -1678,7 +1678,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                                         matchRoles(current)!.awayForwardId
                                       ? "本场前锋"
                                       : "本场后卫"
-                                    : playerPosition(p)}
+                                    : playerPosition(p, season)}
                                 </span>
                                 <small>#{p.number}</small>
                               </button>

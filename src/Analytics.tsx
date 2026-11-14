@@ -47,6 +47,7 @@ import {
 } from "../lib/league.ts";
 import type { League, Match, Player } from "../lib/league.ts";
 import { playerPosition } from "../lib/player-positions.ts";
+import type { SeasonId } from "../lib/seasons.ts";
 import { photoUrl } from "./api";
 import { RATING_BASE } from "../lib/rating.ts";
 import { DOUBLES_PROVISIONAL_THRESHOLD, usesDoublesTrueSkill } from "../lib/rating-trueskill-v1.ts";
@@ -97,9 +98,11 @@ function DoublesRankScore({
 
 function Person({
   player,
+  season,
   compact = false,
 }: {
   player: Player;
+  season?: SeasonId;
   compact?: boolean;
 }) {
   return (
@@ -114,7 +117,7 @@ function Person({
       <span>
         <b>{player.name}</b>
         <small>
-          #{String(player.number).padStart(2, "0")} · {playerPosition(player)}
+          #{String(player.number).padStart(2, "0")} · {playerPosition(player, season)}
         </small>
       </span>
     </span>
@@ -204,7 +207,7 @@ export function RankLeaders({
             onClick={() => onPlayer(p.player.id)}
           >
             <span className="leader-place">0{i + 1}</span>
-            <Person player={p.player} />
+            <Person player={p.player} season={league.seasonId} />
             <div className="leader-rating">
               <strong>
                 <DoublesRankScore stats={p} />
@@ -296,7 +299,7 @@ export function PlayerDirectory({
               onClick={() => onPlayer(p.player.id)}
             >
               <div className="data-player-top">
-                <Person player={p.player} />
+                <Person player={p.player} season={league.seasonId} />
                 <ArrowUpRight size={18} />
               </div>
               <p>{teamsFor(league, p.player) || "暂无所属球队"}</p>
@@ -328,7 +331,7 @@ export function PlayerDirectory({
               <Form stats={p} />
             </button>
             <div className="data-player-actions">
-              <span>{p.player.nickname || playerPosition(p.player)}</span>
+              <span>{p.player.nickname || playerPosition(p.player, league.seasonId)}</span>
               <button
                 className="icon-btn"
                 title="编辑球员资料"
@@ -490,7 +493,7 @@ export function PlayerProfile({
             <Sample games={stats.overall.games} />
           </h1>
           <p>
-            {[teamsFor(league, player), playerPosition(player), player.nickname]
+            {[teamsFor(league, player), playerPosition(player, league.seasonId), player.nickname]
               .filter(Boolean)
               .join(" · ")}
           </p>
@@ -955,6 +958,7 @@ export function AnalyticsPage({
             </div>
             <PlayerRanking
               data={data}
+              season={league.seasonId}
               role={role}
               minimum={minimum}
               query={query}
@@ -973,6 +977,7 @@ export function AnalyticsPage({
         {tab === "positions" && (
           <PositionAnalysis
             data={data}
+            season={league.seasonId}
             minimum={minimum}
             onPlayer={onPlayer}
             onMatch={onMatch}
@@ -1107,7 +1112,7 @@ function ScoringRankings({
               onClick={() => onPlayer(row.player.id)}
             >
               <span className="podium-rank">0{i + 1}</span>
-              <Person player={row.player} />
+              <Person player={row.player} season={league.seasonId} />
               <strong>
                 {row.total}
                 <small>进球</small>
@@ -1142,7 +1147,7 @@ function ScoringRankings({
                       className="data-name-button"
                       onClick={() => onPlayer(row.player.id)}
                     >
-                      <Person player={row.player} compact />
+                      <Person player={row.player} season={league.seasonId} compact />
                     </button>
                   </td>
                   <td>{teamsFor(league, row.player)}</td>
@@ -1532,11 +1537,13 @@ function PositionPartnerships({
 
 function PositionAnalysis({
   data,
+  season,
   minimum,
   onPlayer,
   onMatch,
 }: {
   data: Analytics;
+  season?: SeasonId;
   minimum: number;
   onPlayer: (id: string) => void;
   onMatch: (id: string) => void;
@@ -1591,7 +1598,7 @@ function PositionAnalysis({
                         className="data-name-button"
                         onClick={() => onPlayer(p.player.id)}
                       >
-                        <Person player={p.player} compact />
+                        <Person player={p.player} season={season} compact />
                       </button>
                     </td>
                     <td>
@@ -1734,6 +1741,7 @@ function PositionAnalysis({
 
 function PlayerRanking({
   data,
+  season,
   role,
   minimum,
   query,
@@ -1741,6 +1749,7 @@ function PlayerRanking({
   onPlayer,
 }: {
   data: Analytics;
+  season?: SeasonId;
   role: Role;
   minimum: number;
   query: string;
@@ -1804,7 +1813,7 @@ function PlayerRanking({
                     className="data-name-button"
                     onClick={() => onPlayer(p.player.id)}
                   >
-                    <Person player={p.player} compact />
+                    <Person player={p.player} season={season} compact />
                   </button>
                 </td>
                 <td>
@@ -2315,7 +2324,7 @@ function Honors({
             {stats ? (
               <>
                 <button onClick={() => onPlayer(stats.player.id)}>
-                  <Person player={stats.player} />
+                  <Person player={stats.player} season={league.seasonId} />
                   <ArrowUpRight size={15} />
                 </button>
                 <strong>
@@ -2374,7 +2383,7 @@ function Honors({
             className="club-best"
             onClick={() => onPlayer(clubBest.player.id)}
           >
-            <Person player={clubBest.player} />
+            <Person player={clubBest.player} season={league.seasonId} />
             <span>
               <strong>
                 <DoublesRankScore stats={clubBest} />

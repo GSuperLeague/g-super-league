@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -7,18 +7,23 @@ import {
   Check,
   ChevronRight,
   Flame,
+  Medal,
   Newspaper,
   Pencil,
   Plus,
   Search,
   Trash2,
   Trophy,
+  UsersRound,
   X,
 } from "lucide-react";
 import type { League } from "../lib/league.ts";
 import type { SinglesLeague } from "../lib/singles.ts";
 import type { NewsArticle } from "../lib/news.ts";
 import { betaReport } from "../lib/season-news.ts";
+import { seasonOneReport } from "../lib/season-one-news.ts";
+import { rankTier } from "../lib/rating.ts";
+import leagueLogo from "./assets/g-super-league-logo-640.png";
 import { footballFirstWinArticle } from "../lib/rule-announcements.ts";
 import { FIRST_WIN_POLICY, SEASONS } from "../lib/seasons.ts";
 import { footballSeasonPromos, footballSeasonLabel } from "../lib/season-promos.ts";
@@ -60,9 +65,13 @@ export function News({
     () => ("mode" in league ? null : betaReport(league)),
     [league],
   );
+  const reports = useMemo(
+    () => "mode" in league ? [] : [seasonOneReport, ...(report ? [report] : [])],
+    [league, report],
+  );
   const articles = useMemo(() => {
     const result = new Map<string, NewsArticle>();
-    if (report) result.set(report.article.id, report.article);
+    for (const entry of reports) result.set(entry.article.id, entry.article);
     for (const promo of footballSeasonPromos) result.set(promo.article.id, promo.article);
     if (league.firstWinPolicy?.version === FIRST_WIN_POLICY.version)
       result.set(footballFirstWinArticle.id, footballFirstWinArticle);
@@ -72,7 +81,7 @@ export function News({
         Date.parse(b.publishedAt) - Date.parse(a.publishedAt) ||
         a.id.localeCompare(b.id),
     );
-  }, [league.news, league.firstWinPolicy, report]);
+  }, [league.news, league.firstWinPolicy, reports]);
   const [selected, setSelected] = useState("");
   const [query, setQuery] = useState("");
   const [season, setSeason] = useState("all");
@@ -82,9 +91,8 @@ export function News({
   const selectedPromo = footballSeasonPromos.find((promo) => promo.article.id === article?.id);
   const structured =
     article &&
-    article.id === report?.article.id &&
     !league.news?.some((a) => a.id === article.id)
-      ? report
+      ? reports.find((entry) => entry.article.id === article.id)
       : null;
   const visible = articles.filter(
     (a) =>
@@ -109,8 +117,8 @@ export function News({
   );
   const restoreLabel = !article
     ? ""
-    : article.id === report?.article.id
-      ? "恢复自动定榜稿"
+    : reports.some((entry) => entry.article.id === article.id)
+      ? "恢复默认定榜稿"
       : league.firstWinPolicy?.version === FIRST_WIN_POLICY.version &&
           article.id === footballFirstWinArticle.id
         ? "恢复默认每日奖励公告"
@@ -120,7 +128,7 @@ export function News({
             : "恢复默认赛季预告"
           : "";
   return (
-    <div className="news-page">
+    <div className={`news-page${article?.id === seasonOneReport.article.id && !editing ? " news-page-final" : ""}`}>
       {editing && admin ? (
         <>
           <header className="page-heading">
@@ -274,8 +282,15 @@ export function News({
               </div>
             )}
           </div>
-          <article className="news-reader">
+          <article className={`news-reader${structured?.article.id === "s1-final" ? " news-season-final" : ""}`}>
             <header className="news-article-heading">
+              {structured?.article.id === "s1-final" && (
+                <div className="news-final-masthead">
+                  <img src={leagueLogo} alt="G超联赛" width={52} height={52} />
+                  <span>G SUPER LEAGUE<small>SEASON 01 / FINAL EDITION</small></span>
+                  <b>2026.11.02 — 11.14</b>
+                </div>
+              )}
               <div className="news-meta">
                 <span>{newsSeasonLabel(article)}</span>
                 <time dateTime={article.publishedAt}>
@@ -291,13 +306,40 @@ export function News({
             {selectedPromo && <SeasonTrailers season={selectedPromo.id} withHeading={false} />}
             {structured ? (
               <>
+                {structured.numbers && (
+                  <dl className="news-season-numbers" aria-label="赛季总览">
+                    {structured.numbers.map((number) => (
+                      <div key={number.label}><dt>{number.label}</dt><dd>{number.value}</dd></div>
+                    ))}
+                  </dl>
+                )}
                 <p className="news-paragraph">
                   {article.body.split("\n\n")[0]}
                 </p>
+                {structured.rookies && (
+                  <section className="news-rookies">
+                    <header>
+                      <span className="news-section-kicker">NEW FACES / SEASON 01</span>
+                      <h2><UsersRound size={20} />新面孔，第一份赛季履历</h2>
+                      <p>Beta 无完赛、第一赛季首次出场的四位球员。陈渔在 Beta 已出场两次，不列入本栏。</p>
+                    </header>
+                    <div className="news-rookie-grid">
+                      {structured.rookies.map((rookie, i) => (
+                        <article className="news-rookie" key={rookie.name}>
+                          <span className="news-rookie-number">{String(i + 1).padStart(2, "0")}</span>
+                          <div className="news-rookie-meta"><h3>{rookie.name}</h3><time>{rookie.debut}</time></div>
+                          <b className="news-rookie-record">{rookie.record}</b>
+                          <h4>{rookie.title}</h4>
+                          <p>{rookie.body}</p>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                )}
                 <section className="news-podium">
                   <h2>
                     <Trophy size={19} />
-                    beta赛季终榜 TOP 3
+                    {structured.seasonLabel || "beta赛季终榜"} TOP 3
                   </h2>
                   <div className="news-podium-stories">
                     {structured.rankingStories.map((story, i) => {
@@ -314,28 +356,46 @@ export function News({
                                 TOP {i + 1}
                               </span>
                               <span className="news-profile-season">
-                                beta赛季终榜
+                                {structured.seasonLabel || "beta赛季终榜"}
                               </span>
                             </div>
-                            <h3
-                              id={`news-profile-${p.player.id}`}
-                              className="news-profile-name"
-                            >
-                              {story.byline ? (
-                                <>
-                                  {story.byline.surname}{" "}
-                                  <strong>"{story.byline.nickname}"</strong>{" "}
-                                  {story.byline.givenName}
-                                </>
-                              ) : (
-                                p.player.name
+                            <div className="news-profile-identity">
+                              <div>
+                                {story.distinction && <p className="news-profile-distinction">{story.distinction}</p>}
+                                <h3
+                                  id={`news-profile-${p.player.id}`}
+                                  className="news-profile-name"
+                                >
+                                  {story.byline ? (
+                                    <>
+                                      {story.byline.surname}{" "}
+                                      <strong>"{story.byline.nickname}"</strong>{" "}
+                                      {story.byline.givenName}
+                                    </>
+                                  ) : (
+                                    p.player.name
+                                  )}
+                                </h3>
+                                <p className="news-profile-verse">
+                                  <span>{p.player.name}</span>
+                                  <b>{story.verse}</b>
+                                </p>
+                              </div>
+                              {story.facts && (
+                                <div className="news-profile-score">
+                                  <Trophy size={24} aria-hidden="true" />
+                                  <span>终榜段位分</span>
+                                  <strong>{p.rankPoints.overall}</strong>
+                                  <small>{rankTier(p.rankPoints.overall).name}</small>
+                                </div>
                               )}
-                            </h3>
-                            <p className="news-profile-verse">
-                              <span>{p.player.name}</span>
-                              <b>{story.verse}</b>
-                            </p>
+                            </div>
                           </header>
+                          {story.facts && (
+                            <dl className="news-profile-facts">
+                              {story.facts.map((fact) => <div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}
+                            </dl>
+                          )}
                           <div className="news-profile-copy">
                             {story.body
                               .split("\n\n")
@@ -354,9 +414,46 @@ export function News({
                   赛季档案：{structured.finished} 场完赛，其中{" "}
                   {structured.detailed}{" "}
                   场有逐球记录。乌龙场均、逆转与被逆转仅使用逐球完赛样本。
+                  {structured.methodology && <span>{structured.methodology}</span>}
                 </p>
+                {structured.recordBook && (
+                  <section className="news-record-book" aria-labelledby="news-record-title">
+                    <header>
+                      <span className="news-section-kicker">THE RECORD BOOK / SEASON 01</span>
+                      <h2 id="news-record-title"><Trophy size={20} />赛季纪录册</h2>
+                    </header>
+                    <div className="news-record-grid">
+                      {structured.recordBook.entries.map(entry => (
+                        <article className="news-record" key={entry.label}>
+                          <span>{entry.label}</span>
+                          <strong>{entry.value}<small>分</small></strong>
+                          <b>{entry.name}</b>
+                          <p>{entry.note}</p>
+                          {onMatch && <button className="text-btn" onClick={() => onMatch(entry.matchId)} aria-label={`查看纪录比赛：${entry.label}`} title="查看纪录比赛"><ArrowUpRight size={17} /></button>}
+                        </article>
+                      ))}
+                    </div>
+                    <h3 className="news-leaders-title"><CalendarDays size={18} />榜首的十三天</h3>
+                    <div className="news-leader-totals">
+                      {[...new Set(structured.recordBook.days.map(d => d.name))].map(name => (
+                        <span key={name}>{name}<b>{structured.recordBook!.days.filter(d => d.name === name).length}<small>天</small></b></span>
+                      ))}
+                    </div>
+                    <ol className="news-leader-days" aria-label="每日收盘榜首">
+                      {structured.recordBook.days.map(day => (
+                        <li key={day.date} data-leader={day.name}>
+                          <time dateTime={day.date}>{day.date.slice(5).replace("-", ".")}</time>
+                          <b>{day.name}</b><span>{day.points} 分</span>
+                        </li>
+                      ))}
+                    </ol>
+                    <p className="news-evidence">{structured.recordBook.note}</p>
+                  </section>
+                )}
                 <div className="news-awards">
-                  {structured.awards.map((award) => (
+                  {structured.awards.map((award, index) => (
+                    <Fragment key={award.id}>
+                    {award.category && award.category !== structured.awards[index - 1]?.category && <h2 className="news-award-group"><Award size={20} />{award.category}</h2>}
                     <section className="news-award" key={award.id}>
                       <div className="news-award-label">
                         <Award size={21} />
@@ -399,6 +496,7 @@ export function News({
                         )}
                       </div>
                     </section>
+                    </Fragment>
                   ))}
                 </div>
                 {structured.highlights.length > 0 && (
@@ -464,8 +562,29 @@ export function News({
                     ))}
                   </section>
                 )}
+                {structured.titleEdition && (
+                  <section className="news-titles" aria-labelledby="news-titles-heading">
+                    <header>
+                      <span className="news-section-kicker">SEASON 01 / THE FINAL TITLES</span>
+                      <h2 id="news-titles-heading"><Medal size={22} />{structured.titleEdition.label}</h2>
+                      <p>{structured.titleEdition.note}</p>
+                    </header>
+                    <div className="news-title-grid">
+                      {structured.titleEdition.players.map((player, index) => (
+                        <article className="news-player-title" key={player.playerId}>
+                          <div className="news-title-meta"><span>{String(index + 1).padStart(2, "0")} / S1</span><b>{player.name}</b></div>
+                          <h3>{player.title}</h3>
+                          <dl>
+                            {player.facts.map(fact => <div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}
+                          </dl>
+                          <p>{player.reason}</p>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                )}
                 <section className="news-next-season">
-                  <h2>第一赛季，重新开场</h2>
+                  <h2>{structured.closingTitle || "第一赛季，重新开场"}</h2>
                   <p>{article.body.split("\n\n").at(-1)}</p>
                 </section>
               </>

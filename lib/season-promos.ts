@@ -27,7 +27,7 @@ export const footballSeasonPromos: SeasonPromo[] = [
     id: "s1",
     label: "第一赛季",
     theme: FOOTBALL_CURRENT_THEME,
-    status: "正式进行中",
+    status: "已定榜收官",
     durationSeconds: 26,
     description: "对手先出球，我方借来球的力量弹回去。",
     article: {
@@ -50,7 +50,7 @@ export const footballSeasonPromos: SeasonPromo[] = [
       id: "gsl-s2-full-throttle-preview",
       title: `第二赛季预告：${FOOTBALL_NEXT_THEME}，一个赛季！`,
       summary: "G超将启用爆冲流一个赛季：球杆连续狂转数圈后高速击球。这将会很疯狂！！！！！",
-      body: `第二赛季预告：G超将启用「${FOOTBALL_NEXT_THEME}」一个赛季。\n\n爆冲流，是杆子连续快速旋转好几圈，带动球员高速触球，把球高速射出去。\n\n这将会很疯狂！！！！！\n\n15秒预告以多镜头串起一次完整动作：手柄加速、整杆球员连续翻转、触球爆射、快速跟球、球网随冲击晃动，再落到赛季标题。第二赛季的开赛时间与具体赛程另行公布；当前赛事仍为第一赛季「${FOOTBALL_CURRENT_THEME}」。`,
+      body: `第二赛季预告：G超将启用「${FOOTBALL_NEXT_THEME}」一个赛季。\n\n爆冲流，是杆子连续快速旋转好几圈，带动球员高速触球，把球高速射出去。\n\n这将会很疯狂！！！！！\n\n15秒预告以多镜头串起一次完整动作：手柄加速、整杆球员连续翻转、触球爆射、快速跟球、球网随冲击晃动，再落到赛季标题。第一赛季「${FOOTBALL_CURRENT_THEME}」已定榜收官；第二赛季的开赛时间与具体赛程另行公布。`,
       season: "s1",
       publishedAt: "2026-11-05T06:45:05.000Z",
     },
