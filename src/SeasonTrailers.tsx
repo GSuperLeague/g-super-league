@@ -1,5 +1,6 @@
 import { Download, Film } from "lucide-react";
-import { footballSeasonPromos } from "../lib/season-promos.ts";
+import { FOOTBALL_SPIN_TRIAL_PERIOD, footballSeasonPromos } from "../lib/season-promos.ts";
+import { CURRENT_SEASON } from "../lib/seasons.ts";
 import seasonOneVideo from "./assets/g-super-season-1-trailer.mp4";
 import seasonTwoVideo from "./assets/g-super-season-2-trailer.mp4";
 import seasonOnePoster from "./assets/g-super-season-1-poster.jpg";
@@ -22,23 +23,23 @@ export function SeasonTrailers({
   return (
     <div className={`season-showcase${season ? " is-single" : ""}`}>
       {promos.map((promo) => {
-        const current = promo.id === "s1";
-        const filmLabel = current ? "赛季短片" : "预告片";
+        const current = promo.id === CURRENT_SEASON;
+        const filmLabel = "赛季短片";
         return (
           <section
             className="season-trailers"
-            aria-label={current ? "G超当前赛季" : "G超赛季预告"}
+            aria-label={current ? "G超当前赛季" : "G超第一赛季回顾"}
             key={promo.id}
           >
             {withHeading && (
               <header className="season-trailers-heading">
                 <div>
                   <span>
-                    G SUPER LEAGUE / {current ? "CURRENT SEASON" : "NEXT SEASON"}
+                    G SUPER LEAGUE / {current ? "CURRENT SEASON" : "SEASON RECAP"}
                   </span>
-                  <h2><Film size={21} aria-hidden="true" /> {current ? "当前赛季" : "赛季预告"}</h2>
+                  <h2><Film size={21} aria-hidden="true" /> {current ? "当前赛季" : "第一赛季回顾"}</h2>
                 </div>
-                <p>{current ? "第一赛季已定榜收官，赛季短片留存。" : "下一季，连续狂转数圈，高速出球。"}</p>
+                <p>{current ? `北京时间 ${FOOTBALL_SPIN_TRIAL_PERIOD}允许爆冲。` : "第一赛季终榜已公布。"}</p>
               </header>
             )}
             <article className={`season-trailer-card ${promo.id}`}>

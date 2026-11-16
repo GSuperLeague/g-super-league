@@ -570,33 +570,42 @@ export function leagueForSeason(league: League, season: SeasonId): League {
       league.matches.filter((m) => matchSeason(m.time) === "beta"),
   };
   if (season === "beta") return beta;
-  const previous = analyzeLeague(beta);
+  const priorSeason = season === "s2" ? "s1" : "beta";
+  const savedSeeds = league.seasonArchives?.[priorSeason]?.nextSeasonSeeds;
+  const previous = season === "s2" && savedSeeds
+    ? []
+    : analyzeLeague(priorSeason === "beta" ? beta : leagueForSeason(league, priorSeason)).players;
   const next: League = {
     ...league,
     seasonId: season,
     settings: { ...league.settings, season: seasonName(season) },
     matches: league.matches.filter((m) => matchSeason(m.time) === season),
     ratingSeeds:
-      archive?.nextSeasonSeeds ||
+      savedSeeds ||
       Object.fromEntries(
-        previous.players.map((p) => [
-          p.player.id,
-          {
-            overall: inheritRating(p.rankPoints.overall, p.mmr.overall),
-            forward: inheritRating(p.rankPoints.forward, p.mmr.forward),
-            defender: inheritRating(p.rankPoints.defender, p.mmr.defender),
-          },
-        ]),
+        previous.map((p) => {
+          const seed = (role: Role) => ({
+            ...inheritRating(p.rankPoints[role], p.mmr[role]),
+            ...(season === "s2" && { uncertainty: doublesInitialUncertainty(p.ratedGames[role]) }),
+          });
+          return [p.player.id, {
+            overall: seed("overall"),
+            forward: seed("forward"),
+            defender: seed("defender"),
+          }];
+        }),
       ),
   };
   if (usesDoublesTrueSkill(next)) {
-    const betaGames = new Map(previous.players.map((p) => [p.player.id, p.ratedGames]));
+    const priorGames = new Map(previous.map((p) => [p.player.id, p.ratedGames]));
     next.ratingUncertaintySeeds = Object.fromEntries(next.players.map((player) => {
-      const games = betaGames.get(player.id);
+      const uncertainty = (role: Role) =>
+        next.ratingSeeds?.[player.id]?.[role]?.uncertainty ??
+        doublesInitialUncertainty(priorGames.get(player.id)?.[role] ?? 0);
       return [player.id, {
-        overall: doublesInitialUncertainty(games?.overall ?? 0),
-        forward: doublesInitialUncertainty(games?.forward ?? 0),
-        defender: doublesInitialUncertainty(games?.defender ?? 0),
+        overall: uncertainty("overall"),
+        forward: uncertainty("forward"),
+        defender: uncertainty("defender"),
       }];
     }));
   }

@@ -24,7 +24,7 @@ export function usesDoublesTrueSkill(league: {
   doublesRatingPolicy?: DoublesRatingPolicy;
 }): boolean {
   const policy = league.doublesRatingPolicy;
-  return league.seasonId === DOUBLES_TRUESKILL_POLICY.seasonId &&
+  return (league.seasonId === "s1" || league.seasonId === "s2") &&
     policy?.version === DOUBLES_TRUESKILL_POLICY.version &&
     policy.seasonId === DOUBLES_TRUESKILL_POLICY.seasonId &&
     policy.startsAt === DOUBLES_TRUESKILL_POLICY.startsAt;

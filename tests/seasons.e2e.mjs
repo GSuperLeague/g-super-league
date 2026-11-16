@@ -20,6 +20,7 @@ const read = async () => {
 };
 const before = await read();
 const report = betaReport(before);
+const seasonTwo = leagueForSeason(before, "s2");
 assert.ok(report, "Use a snapshot containing Beta matches");
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -55,9 +56,19 @@ try {
       await page
         .getByRole("combobox", { name: "赛季", exact: true })
         .inputValue(),
-      "s1",
+      "s2",
     );
+    const opening = page.locator(".season-rank-board");
+    assert.equal(await opening.getByRole("columnheader", { name: "起始分", exact: true }).count(), 1);
+    assert.equal(await opening.locator("tbody tr").count(), seasonTwo.players.length);
+    const firstPlayer = seasonTwo.players[0];
+    for (const [role, label] of [["overall", "总览"], ["forward", "前锋"], ["defender", "后卫"]]) {
+      await opening.getByRole("button", { name: label, exact: true }).click();
+      const row = opening.locator("tbody tr").filter({ has: page.getByText(firstPlayer.name, { exact: true }) });
+      assert.equal(await row.locator("td").nth(2).innerText(), String(seasonTwo.ratingSeeds?.[firstPlayer.id]?.[role]?.rankPoints ?? 1200));
+    }
     await capture(`seasons-${width}-start`);
+    await page.getByRole("combobox", { name: "赛季", exact: true }).selectOption("s1");
     await nav("赛场数据").click();
     for (const [role, label] of [
       ["overall", "总览"],
@@ -313,7 +324,7 @@ try {
   assert.equal(await page.locator(".news-list-item").count(), 0);
   await page
     .getByRole("combobox", { name: "新闻赛季", exact: true })
-    .selectOption("s1");
+    .selectOption("s2");
   await page.locator(".news-list-item").click();
   await page
     .getByRole("heading", { name: `${title} 已编辑`, exact: true })

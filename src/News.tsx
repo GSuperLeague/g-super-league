@@ -25,7 +25,7 @@ import { seasonOneReport } from "../lib/season-one-news.ts";
 import { rankTier } from "../lib/rating.ts";
 import leagueLogo from "./assets/g-super-league-logo-640.png";
 import { footballFirstWinArticle } from "../lib/rule-announcements.ts";
-import { FIRST_WIN_POLICY, SEASONS } from "../lib/seasons.ts";
+import { CURRENT_SEASON, FIRST_WIN_POLICY, SEASONS } from "../lib/seasons.ts";
 import { footballSeasonPromos, footballSeasonLabel } from "../lib/season-promos.ts";
 import { SeasonTrailers } from "./SeasonTrailers";
 import "./news.css";
@@ -44,9 +44,7 @@ const dateInput = (time: string) =>
     .replace(" ", "T");
 type NewsAction = { type: string; id: string; data?: unknown };
 const newsSeasonLabel = (article: NewsArticle) =>
-  footballSeasonPromos.some((promo) => promo.id === "s2" && promo.article.id === article.id)
-    ? "第二赛季预告"
-    : footballSeasonLabel(article.season);
+  footballSeasonLabel(article.season);
 
 export function News({
   league,
@@ -107,7 +105,7 @@ export function News({
         title: "",
         summary: "",
         body: "",
-        season: "s1",
+        season: CURRENT_SEASON,
         publishedAt: new Date().toISOString(),
       },
     );
@@ -123,9 +121,7 @@ export function News({
           article.id === footballFirstWinArticle.id
         ? "恢复默认每日奖励公告"
         : selectedPromo
-          ? selectedPromo.id === "s1"
-            ? "恢复默认赛季介绍"
-            : "恢复默认赛季预告"
+          ? "恢复默认赛季介绍"
           : "";
   return (
     <div className={`news-page${article?.id === seasonOneReport.article.id && !editing ? " news-page-final" : ""}`}>

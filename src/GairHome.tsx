@@ -13,7 +13,8 @@ import gbLeagueLogo from "./assets/gb-league-logo-640.png";
 import gSuperLeagueLogo from "./assets/g-super-league-logo-640.png";
 import { LeagueAnnouncements } from "./LeagueAnnouncements";
 import { SeasonTrailers } from "./SeasonTrailers";
-import { FOOTBALL_CURRENT_THEME } from "../lib/season-promos.ts";
+import { FOOTBALL_SPIN_TRIAL_PERIOD, footballSeasonLabel } from "../lib/season-promos.ts";
+import { CURRENT_SEASON } from "../lib/seasons.ts";
 import "./gair.css";
 export function ShuttleIcon({ size = 24 }: { size?: number }) {
   return (
@@ -168,7 +169,7 @@ export default function GairHome() {
             <span className="gair-visual-caption">小小球场，大大热爱。</span>
           </div>
         </section>
-        <SeasonTrailers />
+        <SeasonTrailers season={CURRENT_SEASON} />
         <LeagueAnnouncements />
         <div className="gair-section-heading">
           <div>
@@ -184,16 +185,14 @@ export default function GairHome() {
                 <img src={gSuperLeagueLogo} alt="" width={1254} height={1254} />
               </span>
               <span className="gair-card-badge">
-                <i /> 第一赛季 · {FOOTBALL_CURRENT_THEME}
+                <i /> {footballSeasonLabel(CURRENT_SEASON)}
               </span>
             </div>
             <div className="gair-card-body">
               <span className="gair-eyebrow">TABLE FOOTBALL</span>
               <h2>G超 · 桌足联赛</h2>
               <p>
-                每一球，都算数。
-                <br />
-                第一赛季「{FOOTBALL_CURRENT_THEME}」：借对手来球的力量，弹回去。
+                第二赛季已开赛。北京时间 {FOOTBALL_SPIN_TRIAL_PERIOD}允许爆冲。
               </p>
               <div className="gair-card-counts">
                 <span>

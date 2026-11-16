@@ -26,12 +26,13 @@ import {
 } from "lucide-react";
 import { SeasonPicker } from "./SeasonPicker";
 import { News } from "./News";
-import { matchSeason, assertSeasonWritable } from "../lib/seasons.ts";
+import { CURRENT_SEASON, matchSeason, assertSeasonWritable } from "../lib/seasons.ts";
 import { ScoringNotice } from "./ScoringNotice";
 import { DailyRewardBreakdown } from "./DailyRewardBreakdown";
-import type { SeasonId } from "../lib/seasons.ts";
+import type { RatingSeed, SeasonId } from "../lib/seasons.ts";
 import { Modal } from "./App";
 import { RankLegend, RankScore } from "./RankScore";
+import { RATING_BASE } from "../lib/rating.ts";
 import { singlesRankHistory } from "../lib/rank-history.ts";
 import { RankHistory } from "./RankHistory";
 import gSuperLeagueLogo from "./assets/g-super-league-logo-640.png";
@@ -150,11 +151,14 @@ function Ranking({
   rows,
   kind,
   limit,
+  startingRatings,
 }: {
   rows: SinglesStats[];
   kind: "points" | "rank";
   limit?: number;
+  startingRatings?: Record<string, RatingSeed>;
 }) {
+  const showStartingPoints = kind === "rank" && Boolean(startingRatings);
   return (
     <div
       className={`table-wrap singles-table${limit ? " singles-table-compact" : ""}`}
@@ -164,6 +168,7 @@ function Ranking({
           <tr>
             <th>排名</th>
             <th className="align-left">球员</th>
+            {showStartingPoints && <th>起始分</th>}
             <th>{kind === "rank" ? "段位分" : "积分"}</th>
             <th>场次</th>
             {!limit && (
@@ -191,6 +196,9 @@ function Ranking({
                     <Person player={s.player} />
                   </button>
                 </td>
+                {showStartingPoints && (
+                  <td>{startingRatings?.[s.player.id]?.rankPoints ?? RATING_BASE}</td>
+                )}
                 <td>
                   <strong>
                     {kind === "rank" ? (
@@ -245,7 +253,7 @@ export default function Singles({
     selectedId = decodeURIComponent(route[1] || "");
   } catch {}
   const [rawLeague, setLeague] = useState<SinglesLeague>(emptySinglesLeague);
-  const [season, setSeason] = useState<SeasonId>("s1");
+  const [season, setSeason] = useState<SeasonId>(CURRENT_SEASON);
   const league = useMemo(
     () => singlesForSeason(rawLeague, season),
     [rawLeague, season],
@@ -582,7 +590,9 @@ export default function Singles({
                         ? profile.player.name
                         : page === "matches" && current
                           ? "单打比赛"
-                          : `单打${heading.replace(/^单打/, "")}`}
+                          : page === "overview" && season === "s2"
+                            ? "单打第二赛季看板"
+                            : `单打${heading.replace(/^单打/, "")}`}
                     </h1>
                     <p>{league.settings.season}</p>
                   </div>
@@ -698,10 +708,16 @@ export default function Singles({
                         </button>
                       </div>
                       <Ranking
-                        rows={stats.filter((s) => s.games || season === "s1")}
+                        rows={stats.filter((s) => s.games || season !== "beta")}
                         kind="rank"
-                        limit={5}
+                        limit={season === "s2" ? stats.length || 5 : 5}
+                        startingRatings={season === "s2" ? league.ratingSeeds : undefined}
                       />
+                      {season === "s2" && (
+                        <p className="singles-caption">
+                          按第一赛季单打终榜结算，超过 1200 的部分继承 33%，加分四舍五入。
+                        </p>
+                      )}
                     </section>
                   </div>
                   <section className="singles-section">
@@ -805,7 +821,11 @@ export default function Singles({
                     </div>
                     {filters}
                   </div>
-                  <Ranking rows={filteredStats} kind={ranking} />
+                  <Ranking
+                    rows={filteredStats}
+                    kind={ranking}
+                    startingRatings={season === "s2" ? league.ratingSeeds : undefined}
+                  />
                   <p className="singles-caption">
                     {month
                       ? "当前月份内的赛果从本赛季起始分重新计算段位分。"
