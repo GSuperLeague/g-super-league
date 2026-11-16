@@ -29,6 +29,29 @@
   color: #375c47;
   font-weight: 500;
 }
+.scoring-policy-notice.spin-trial {
+  background: #fff4dd;
+  border-color: #ecdcb8;
+  color: #6b552b;
+}
+.scoring-policy-notice.spin-trial b {
+  color: #604306;
+  font-weight: 700;
+}
+.season-rank-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 0 18px 14px;
+}
+.season-rank-controls p {
+  margin: 0;
+}
+.season-rank-board th,
+.season-rank-board td {
+  white-space: nowrap;
+}
 @media (max-width: 600px) {
   .top-actions {
     gap: 10px;

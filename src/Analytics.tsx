@@ -183,6 +183,59 @@ export function RankLeaders({
   onAnalytics: () => void;
 }) {
   const data = useMemo(() => analyzeLeague(league), [league]);
+  const [role, setRole] = useState<Role>("overall");
+  if (league.seasonId === "s2") {
+    const rows = [...data.players].sort((a, b) =>
+      b.rankPoints[role] - a.rankPoints[role] ||
+      b[role].games - a[role].games ||
+      a.player.id.localeCompare(b.player.id),
+    );
+    return (
+      <section className="data-section overview-elo season-rank-board">
+        <div className="data-section-heading">
+          <h2><TrendingUp size={18} />个人段位榜</h2>
+          <button className="text-btn" onClick={onAnalytics}>
+            全部数据 <ArrowUpRight size={15} />
+          </button>
+        </div>
+        <div className="season-rank-controls">
+          <RolePicker role={role} setRole={setRole} />
+          <p className="data-caption">
+            起始分为 1200 加上上赛季超过 1200 部分的 33%，加分四舍五入。
+          </p>
+        </div>
+        <div className="data-table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th scope="col">排名</th>
+                <th scope="col">球员</th>
+                <th scope="col">起始分</th>
+                <th scope="col">本季段位分</th>
+                <th scope="col">本季出场</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((p, index) => (
+                <tr key={p.player.id}>
+                  <td>{index + 1}</td>
+                  <td>
+                    <button className="data-name-button" onClick={() => onPlayer(p.player.id)}>
+                      <Person player={p.player} season={league.seasonId} compact />
+                    </button>
+                  </td>
+                  <td>{league.ratingSeeds?.[p.player.id]?.[role]?.rankPoints ?? RATING_BASE}</td>
+                  <td><DoublesRankScore stats={p} role={role} /></td>
+                  <td>{p[role].games}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!rows.length && <DataEmpty text="暂无已登记球员" />}
+      </section>
+    );
+  }
   const leaders = data.players
     .filter((p) => p.ratedGames.overall > 0 || league.seasonId === "s1")
     .sort(byRating)
@@ -514,7 +567,9 @@ export function PlayerProfile({
           {
             label: `${role === "overall" ? "总" : roleLabels[role]}段位分`,
             value: <DoublesRankScore stats={stats} role={role} showTier />,
-            sub: `${stats.ratedGames[role]} 场有效计分`,
+            sub: league.seasonId === "s2"
+              ? `起始 ${league.ratingSeeds?.[player.id]?.[role]?.rankPoints ?? RATING_BASE} 分 · ${stats.ratedGames[role]} 场有效计分`
+              : `${stats.ratedGames[role]} 场有效计分`,
             tone: "blue",
           },
           {

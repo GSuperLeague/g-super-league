@@ -453,15 +453,16 @@ export function singlesForSeason(
       league.matches.filter((m) => matchSeason(m.time) === "beta"),
   };
   if (season === "beta") return beta;
+  const priorSeason = season === "s2" ? "s1" : "beta";
   const next: SinglesLeague = {
     ...league,
     seasonId: season,
     settings: { ...league.settings, season: seasonName(season) },
     matches: league.matches.filter((m) => matchSeason(m.time) === season),
     ratingSeeds:
-      archive?.nextSeasonSeeds ||
+      league.seasonArchives?.[priorSeason]?.nextSeasonSeeds ||
       Object.fromEntries(
-        analyzeSingles(beta).map((p) => [
+        analyzeSingles(priorSeason === "beta" ? beta : singlesForSeason(league, priorSeason)).map((p) => [
           p.player.id,
           inheritRating(p.rankPoints, p.mmr),
         ]),

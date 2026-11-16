@@ -30,7 +30,7 @@ export function applyNewsAction(
     return value.trim();
   }
   const season = data.season;
-  if (season !== "beta" && season !== "s1")
+  if (season !== "beta" && season !== "s1" && season !== "s2")
     throw new Error("请选择新闻所属赛季");
   const publishedAt = text("publishedAt", 50);
   if (!Number.isFinite(Date.parse(publishedAt)))

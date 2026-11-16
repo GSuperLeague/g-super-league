@@ -1,13 +1,17 @@
 import { RATING_BASE, roundRating } from "./rating-v1.ts";
 
 export const SEASON_START = "2026-11-02T00:00:00+08:00";
+export const SEASON_TWO_START = "2026-11-16T00:00:00+08:00";
+export const SEASON_TWO_SPIN_END = "2026-11-19T00:00:00+08:00";
 export const SEASON_INHERITANCE = 0.33;
 export const SEASONS = [
-  { id: "s1", name: "第一赛季", period: "2026.11.02 起" },
+  { id: "s2", name: "第二赛季", period: "2026.11.16 起" },
+  { id: "s1", name: "第一赛季", period: "2026.11.02–11.15" },
   { id: "beta", name: "beta赛季", period: "2026.11.01 截止" },
 ] as const;
 export type SeasonId = (typeof SEASONS)[number]["id"];
-export type RatingSeed = { rankPoints: number; mmr: number };
+export const CURRENT_SEASON = SEASONS[0].id;
+export type RatingSeed = { rankPoints: number; mmr: number; uncertainty?: number };
 export type SeasonArchive<T, M, P, Team> = {
   schemaVersion: 1;
   seasonId: "beta";
@@ -36,7 +40,15 @@ export type FirstWinPolicy = typeof FIRST_WIN_POLICY;
 export type SeasonContext<T, M = unknown, P = unknown, Team = unknown> = {
   seasonId?: SeasonId;
   ratingSeeds?: Record<string, T>;
-  seasonArchives?: { beta?: SeasonArchive<T, M, P, Team> };
+  seasonArchives?: {
+    beta?: SeasonArchive<T, M, P, Team>;
+    s1?: {
+      cutoff: string;
+      capturedAt: string;
+      sourceRevision: number;
+      nextSeasonSeeds: Record<string, T>;
+    };
+  };
   firstWinPolicy?: FirstWinPolicy;
   // Derived from the complete season before applying UI filters.
   firstWinAwards?: Record<string, number>;
@@ -74,7 +86,7 @@ export function buildFirstWinAwards(
     if (
       !Number.isFinite(Date.parse(match.time)) ||
       Date.parse(match.time) < Date.parse(policy.startsAt) ||
-      matchSeason(match.time) !== policy.seasonId
+      matchSeason(match.time) === "beta"
     )
       continue;
     const day = dayFormat.format(new Date(match.time));
@@ -115,7 +127,13 @@ export function assertSeasonWritable(
 }
 
 export function matchSeason(time: string): SeasonId {
-  return Date.parse(time) < Date.parse(SEASON_START) ? "beta" : "s1";
+  const matchTime = Date.parse(time);
+  if (matchTime >= Date.parse(SEASON_TWO_START)) return "s2";
+  return matchTime < Date.parse(SEASON_START) ? "beta" : "s1";
+}
+
+export function spinTrialActive(now = Date.now()): boolean {
+  return now >= Date.parse(SEASON_TWO_START) && now < Date.parse(SEASON_TWO_SPIN_END);
 }
 
 export function inheritRating(points: number, mmr: number): RatingSeed {

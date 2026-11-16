@@ -15,7 +15,14 @@ import {
   singlesForSeason,
   singlesStandings,
 } from "../lib/singles.ts";
-import { inheritRating, matchSeason, SEASON_START } from "../lib/seasons.ts";
+import {
+  FIRST_WIN_POLICY,
+  inheritRating,
+  matchSeason,
+  SEASON_START,
+  SEASON_TWO_START,
+  spinTrialActive,
+} from "../lib/seasons.ts";
 import { betaReport, leadHistory } from "../lib/season-news.ts";
 import { DOUBLES_TRUESKILL_POLICY, settleDoublesTrueSkill } from "../lib/rating-trueskill-v1.ts";
 
@@ -77,6 +84,11 @@ test("season boundary uses Beijing midnight including equivalent UTC instants", 
     "2026-11-02T04:00:00+08:00",
   ])
     assert.equal(matchSeason(time), "s1");
+  assert.equal(matchSeason("2026-11-15T23:59:59.999+08:00"), "s1");
+  assert.equal(matchSeason("2026-11-15T16:00:00Z"), "s2");
+  assert.equal(spinTrialActive(Date.parse(SEASON_TWO_START)), true);
+  assert.equal(spinTrialActive(Date.parse("2026-11-18T23:59:59.999+08:00")), true);
+  assert.equal(spinTrialActive(Date.parse("2026-11-19T00:00:00+08:00")), false);
   assert.deepEqual(inheritRating(1526, 1532.123), {
     rankPoints: 1308,
     mmr: 1200 + 332.123 * 0.33,
@@ -176,6 +188,40 @@ test("a higher uncertainty gives a teammate more of the hidden rating correction
   assert.equal(after[2].mean, after[3].mean);
 });
 
+test("second-season doubles settles from all three closing seeds and keeps daily rewards", () => {
+  const league = result({
+    ...fixture(),
+    firstWinPolicy: FIRST_WIN_POLICY,
+    doublesRatingPolicy: DOUBLES_TRUESKILL_POLICY,
+  }, "s1-final", "2026-11-15T23:59:00+08:00", 7, 5);
+  const closing = analyzeLeague(leagueForSeason(league, "s1"));
+  const opening = leagueForSeason(league, "s2");
+  assert.equal(opening.matches.length, 0);
+  for (const p of analyzeLeague(opening).players) {
+    const final = closing.players.find((x) => x.player.id === p.player.id)!;
+    assert.equal(p.overall.games, 0);
+    for (const role of ["overall", "forward", "defender"] as const) {
+      assert.equal(p.rankPoints[role], inheritRating(final.rankPoints[role], final.mmr[role]).rankPoints);
+    }
+  }
+  assert.ok(opening.ratingUncertaintySeeds!.p1.forward < opening.ratingUncertaintySeeds!.p1.defender);
+  league.seasonArchives = {
+    s1: { cutoff: SEASON_TWO_START, capturedAt: SEASON_TWO_START, sourceRevision: 1,
+          nextSeasonSeeds: opening.ratingSeeds! },
+  };
+  const withResult = result(league, "opening", SEASON_TWO_START, 7, 2);
+  assert.deepEqual(analyzeLeague(leagueForSeason(withResult, "s1")), closing);
+  const seasonTwo = leagueForSeason(withResult, "s2");
+  const rating = matchRatings(seasonTwo, seasonTwo.matches[0]);
+  assert.equal(rating.players[0].overall.before, opening.ratingSeeds!.p1.overall.rankPoints);
+  const players = analyzeLeague(seasonTwo).players;
+  assert.equal(players[0].ratingUncertainty!.forward < opening.ratingUncertaintySeeds!.p1.forward, true);
+  assert.equal(players[0].firstWinPoints.forward, 10);
+  assert.equal(players[2].participationPoints, 5);
+  const corrected = result(withResult, "s1-final", "2026-11-15T23:59:00+08:00", 0, 7);
+  assert.deepEqual(analyzeLeague(leagueForSeason(corrected, "s2")), analyzeLeague(seasonTwo));
+});
+
 test("draws pull different team estimates together and very unlikely wins stay finite", () => {
   const before = [20_000, 20_000, 1200, 1200].map((mean) => ({ mean, uncertainty: 180 }));
   const draw = settleDoublesTrueSkill(before, 0.5).after;
@@ -221,6 +267,16 @@ test("singles inherits its own Beta ratings without leaking old stats into new-s
   assert.equal(next[0].history[0].before, seeds[0].rankPoints);
   assert.equal(next[0].wins, 1);
   assert.deepEqual(analyzeSingles(singlesForSeason(singles, "beta")), old);
+  const seasonTwo = analyzeSingles(singlesForSeason(singles, "s2"));
+  assert.equal(seasonTwo[0].rankPoints, inheritRating(next[0].rankPoints, next[0].mmr).rankPoints);
+  assert.equal(seasonTwo[1].rankPoints, 1200);
+  assert.ok(seasonTwo.every((p) => p.games === 0));
+  singles.firstWinPolicy = FIRST_WIN_POLICY;
+  const continued = applySinglesAction(singles, save("s2-opening", SEASON_TWO_START));
+  const s2 = analyzeSingles(singlesForSeason(continued, "s2"));
+  assert.equal(s2[0].games, 1);
+  assert.equal(s2[0].firstWinPoints, 10);
+  assert.equal(s2[1].participationPoints, 5);
 });
 function detailed(
   league: League,

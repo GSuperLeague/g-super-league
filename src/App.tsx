@@ -8,7 +8,7 @@ import {
 } from "./Analytics";
 import { leagueForSeason } from "../lib/analytics.ts";
 import { playerPosition, playerPositionOptions } from "../lib/player-positions.ts";
-import { matchSeason, assertSeasonWritable } from "../lib/seasons.ts";
+import { CURRENT_SEASON, SEASONS, matchSeason, assertSeasonWritable } from "../lib/seasons.ts";
 import { ScoringNotice } from "./ScoringNotice";
 import { SeasonTrailers } from "./SeasonTrailers";
 import { footballSeasonLabel } from "../lib/season-promos.ts";
@@ -372,7 +372,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
     [matchFilter, setMatchFilter] = useState("all"),
     [selectedMatch, setSelectedMatch] = useState<string | null>(null),
     [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
-  const [season, setSeason] = useState<SeasonId>("s1");
+  const [season, setSeason] = useState<SeasonId>(CURRENT_SEASON);
   const s = useMemo(
     () => leagueForSeason(rawLeague, season),
     [rawLeague, season],
@@ -806,12 +806,10 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                 <div className="season-context">
                   <strong>
                     {footballSeasonLabel(season)}
-                    {season === "beta" ? " · 已收官" : " · 进行中"}
+                    {season === CURRENT_SEASON ? " · 进行中" : " · 已收官"}
                   </strong>
                   <span>
-                    {season === "beta"
-                      ? "截至 2026.11.01"
-                      : "2026.11.02 起 · 超出 1200 的段位分继承 33%"}
+                    {SEASONS.find((entry) => entry.id === season)?.period}
                   </span>
                 </div>
               )}
@@ -846,7 +844,8 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                         THE HOME OF TABLE FOOTBALL
                       </span>
                       <h1>
-                        联赛总览<span className="title-dot">.</span>
+                        {season === "s2" ? "第二赛季看板" : "联赛总览"}
+                        <span className="title-dot">.</span>
                       </h1>
                     </div>
                     <button
@@ -864,9 +863,19 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                         G超 · 桌面足球超级联赛
                       </div>
                       <h2>
-                        {season === "s1" ? <>弹反<br /><span>赛季</span></> : <>每一球，<br />都<span>算数。</span></>}
+                        {season === "s2"
+                          ? <>爆冲流<br /><span>第二赛季</span></>
+                          : season === "s1"
+                            ? <>弹反<br /><span>赛季</span></>
+                            : <>每一球，<br />都<span>算数。</span></>}
                       </h2>
-                      <p>{season === "s1" ? "第一赛季正式进行中 · 借对手来球的力量，弹回去。" : "属于我们的球场，属于每个人的高光。"}</p>
+                      <p>
+                        {season === "s2"
+                          ? "北京时间 11 月 16 日开赛"
+                          : season === "s1"
+                            ? "第一赛季收官 · 借对手来球的力量，弹回去。"
+                            : "属于我们的球场，属于每个人的高光。"}
+                      </p>
                       <button
                         className="btn lime"
                         onClick={() =>
@@ -946,7 +955,6 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                       </div>
                     ))}
                   </div>
-                  {season === "s1" && <SeasonTrailers />}
                   {(!s.teams.length ||
                     !s.players.length ||
                     !rawLeague.matches.length) && (
@@ -1003,6 +1011,7 @@ export default function Home({ modeSwitch }: { modeSwitch?: ReactNode }) {
                     }}
                     onAnalytics={() => go("analytics")}
                   />
+                  {season !== "beta" && <SeasonTrailers season={season} />}
                   <div className="dashboard-grid">
                     <section className="panel">
                       <div className="panel-heading">
