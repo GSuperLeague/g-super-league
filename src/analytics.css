@@ -593,8 +593,11 @@
 .data-elo {
   font-family: "Barlow Condensed", Arial, sans-serif;
   color: var(--data-blue);
-  font-size: 23px;
+  font-size: 22px;
   font-weight: 600;
+}
+.ranking-table .rank-score {
+  min-width: 102px;
 }
 .positive {
   color: #3f8061 !important;
@@ -717,16 +720,18 @@
     padding: 13px 8px;
   }
   .match-elo-table td.elo-number {
-    font-size: 18px;
+    font-size: 16px;
   }
   .match-elo-table .rank-score {
     gap: 4px;
+    padding: 2px 6px 2px 4px;
+    border-radius: 7px;
   }
   .match-elo-table .tier-emblem {
-    --emblem-size: 24px;
-    width: 24px;
-    height: 24px;
-    flex-basis: 24px;
+    --emblem-size: 22px;
+    width: 22px;
+    height: 22px;
+    flex-basis: 22px;
   }
 }
 .data-empty {
@@ -883,6 +888,18 @@
 }
 .directory-metrics > div:first-child strong {
   color: var(--data-blue);
+}
+.directory-metrics .rank-score {
+  padding: 3px 8px 3px 5px;
+  gap: 5px;
+  font-size: 23px;
+  max-width: 100%;
+}
+.directory-metrics .tier-emblem {
+  --emblem-size: 28px;
+  width: 28px;
+  height: 28px;
+  flex-basis: 28px;
 }
 .directory-metrics small {
   font-size: 9px;
