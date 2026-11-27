@@ -1,0 +1,755 @@
+/* ==========================================================================
+   GAIR Super League — Modern Visual Polish & Stadium Atmosphere Layer
+   Scoped cleanly so lazy-loaded route stylesheets never override upgrades.
+   Preserves all core functionality, DOM structure, routes, and accessibility.
+   ========================================================================== */
+
+:root {
+  --gair-shadow-sm: 0 6px 18px -10px rgba(17, 41, 31, 0.16);
+  --gair-shadow-md: 0 16px 36px -18px rgba(15, 38, 28, 0.24);
+  --gair-shadow-lg: 0 26px 60px -24px rgba(11, 31, 22, 0.36);
+  --gair-lime-glow: 0 12px 30px -10px rgba(169, 229, 86, 0.58);
+  --gair-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::selection {
+  background: rgba(197, 239, 131, 0.65);
+  color: #132c21;
+}
+
+/* ---------- Ambient Light Canvas ---------- */
+html body {
+  background:
+    radial-gradient(circle at 88% 0%, rgba(197, 239, 131, 0.14), transparent 36%),
+    radial-gradient(circle at 8% 24%, rgba(39, 77, 61, 0.06), transparent 32%),
+    #f3f5ee;
+}
+
+body .gair-home,
+body .league-gallery {
+  background:
+    radial-gradient(ellipse 68% 42% at 86% -4%, rgba(197, 239, 131, 0.24), transparent 62%),
+    radial-gradient(ellipse 52% 38% at 4% 28%, rgba(45, 102, 74, 0.08), transparent 62%),
+    linear-gradient(180deg, #f5f7f0 0%, #eff3e8 100%);
+}
+
+body .gb-app {
+  background:
+    radial-gradient(ellipse 55% 36% at 92% 0%, rgba(199, 237, 138, 0.18), transparent 55%),
+    #f3f6ee;
+}
+
+/* ---------- Frosted Sticky Headers & Topbars ---------- */
+.gair-home .gair-header,
+.league-gallery .gair-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  max-width: none;
+  padding-inline: max(44px, calc((100% - 1352px) / 2));
+  background: rgba(246, 248, 241, 0.8);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border-bottom: 1px solid rgba(187, 204, 173, 0.55);
+  box-shadow: 0 8px 26px -22px rgba(17, 42, 31, 0.35);
+}
+
+.gair-wordmark .gair-mark {
+  background: linear-gradient(135deg, #d7fa8e 0%, #a5df58 100%);
+  box-shadow:
+    0 10px 22px -10px rgba(139, 198, 56, 0.72),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  transition: transform 0.28s var(--gair-ease), box-shadow 0.28s ease;
+}
+
+.gair-wordmark:hover .gair-mark {
+  transform: rotate(-5deg) scale(1.05);
+  box-shadow: 0 14px 26px -10px rgba(139, 198, 56, 0.85);
+}
+
+.gair-header .gair-header-note {
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(197, 214, 181, 0.65);
+  color: #4f6653;
+}
+
+.gair-header-note i,
+.gair-league-card .gair-card-badge i {
+  box-shadow: 0 0 0 4px rgba(147, 184, 77, 0.22);
+  animation: gair-pulse-dot 2.4s ease-in-out infinite;
+}
+
+.gair-header .gair-nav-link {
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(190, 208, 176, 0.78);
+  font-weight: 600;
+  color: #1f3c2e;
+  box-shadow: 0 4px 12px -8px rgba(19, 43, 32, 0.22);
+  transition:
+    transform 0.22s var(--gair-ease),
+    background-color 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.gair-header .gair-nav-link:hover {
+  background: #ffffff;
+  border-color: #8db85c;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -14px rgba(23, 55, 40, 0.36);
+}
+
+.gair-header-actions .gair-nav-link:last-child {
+  background: linear-gradient(135deg, #1d3c2e, #2b5741);
+  border-color: transparent;
+  color: #eff8e3;
+}
+
+.gair-header-actions .gair-nav-link:last-child:hover {
+  background: linear-gradient(135deg, #254d3b, #34694f);
+  color: #ffffff;
+}
+
+.main-shell .topbar,
+.gb-workspace .gb-topbar {
+  background: rgba(252, 253, 249, 0.92);
+  border-bottom: 1px solid rgba(203, 215, 193, 0.65);
+}
+
+@media (min-width: 781px) {
+  .main-shell .topbar,
+  .gb-workspace .gb-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 25;
+    background: rgba(252, 253, 249, 0.82);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+  }
+}
+
+/* ---------- Home Hero: Stadium Spotlight ---------- */
+.gair-home .gair-welcome {
+  border-radius: 22px;
+  background:
+    radial-gradient(ellipse 64% 85% at 86% 18%, rgba(197, 239, 131, 0.24), transparent 58%),
+    radial-gradient(ellipse 50% 70% at 12% 100%, rgba(62, 160, 126, 0.24), transparent 56%),
+    linear-gradient(128deg, #0f231b 0%, #1c3e30 48%, #132e23 100%);
+  border: 1px solid rgba(197, 239, 131, 0.24);
+  box-shadow:
+    0 28px 64px -26px rgba(10, 30, 21, 0.56),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.gair-home .gair-welcome::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(197, 239, 131, 0.048) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(197, 239, 131, 0.048) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse at 70% 50%, #000 20%, transparent 80%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.gair-home .gair-welcome::after {
+  content: "";
+  position: absolute;
+  inset: -40% auto -40% -35%;
+  width: 45%;
+  background: linear-gradient(
+    110deg,
+    transparent 20%,
+    rgba(218, 255, 152, 0.09) 50%,
+    transparent 80%
+  );
+  transform: skewX(-18deg);
+  animation: gair-hero-sweep 11s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.gair-home .gair-welcome h1 {
+  text-shadow: 0 8px 28px rgba(4, 15, 10, 0.35);
+}
+
+.gair-home .gair-welcome h1 > span {
+  background: linear-gradient(95deg, #d8ff91 0%, #b4f177 52%, #7ee9c7 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.gair-home .gair-welcome-copy > p {
+  color: #cde0c7;
+}
+
+.gair-home .gair-primary {
+  border-radius: 11px;
+  background: linear-gradient(135deg, #d7fa8e 0%, #b7e766 100%);
+  color: #153022;
+  font-weight: 700;
+  box-shadow:
+    var(--gair-lime-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  transition:
+    transform 0.24s var(--gair-ease),
+    box-shadow 0.24s ease,
+    filter 0.24s ease;
+}
+
+.gair-home .gair-primary:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 18px 36px -10px rgba(176, 238, 92, 0.72),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  filter: brightness(1.03);
+}
+
+.gair-home .gair-primary svg {
+  transition: transform 0.24s var(--gair-ease);
+}
+
+.gair-home .gair-primary:hover svg {
+  transform: translateX(4px);
+}
+
+.gair-home .gair-hero-bottom {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.gair-home .gair-hero-bottom span {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(197, 239, 131, 0.18);
+  color: #c5dac0;
+  font-size: 11px;
+  backdrop-filter: blur(6px);
+}
+
+.gair-home .gair-hero-bottom span:last-child {
+  background: rgba(197, 239, 131, 0.14);
+  border-color: rgba(197, 239, 131, 0.34);
+  color: #e0f9ad;
+}
+
+.gair-home .gair-hero-visual > svg:not(.gair-court-art) {
+  filter: drop-shadow(0 12px 24px rgba(197, 239, 131, 0.35));
+  animation: gair-float 5.6s ease-in-out infinite;
+}
+
+.gair-home .gair-orbit {
+  border-color: rgba(197, 239, 131, 0.24);
+  box-shadow: 0 0 0 28px rgba(197, 239, 131, 0.03);
+}
+
+/* ---------- Home League Cards & Values ---------- */
+.gair-home .gair-section-heading h2 {
+  font-weight: 800;
+  color: #163226;
+}
+
+.gair-home .gair-league-card {
+  border-radius: 18px;
+  border: 1px solid rgba(188, 206, 173, 0.65);
+  background: linear-gradient(155deg, #ffffff 0%, #f8fbf3 100%);
+  box-shadow: var(--gair-shadow-md);
+  transition:
+    transform 0.3s var(--gair-ease),
+    box-shadow 0.3s ease,
+    border-color 0.25s ease;
+}
+
+.gair-home .gair-league-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, #254d3a, #9bd457, transparent);
+  opacity: 0.78;
+  z-index: 3;
+}
+
+.gair-home .gair-league-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(132, 176, 86, 0.85);
+  box-shadow:
+    0 26px 52px -22px rgba(18, 45, 33, 0.28),
+    0 0 0 1px rgba(176, 224, 108, 0.35);
+}
+
+.gair-home .gair-league-card .gair-card-background-logo {
+  transition: transform 0.55s var(--gair-ease), opacity 0.4s ease;
+}
+
+.gair-home .gair-league-card:hover .gair-card-background-logo {
+  transform: translateY(-46%) scale(1.06) rotate(-2deg);
+  opacity: 0.27;
+}
+
+.gair-home .gair-league-card.gair-badminton {
+  background:
+    radial-gradient(circle at 90% 10%, rgba(197, 239, 131, 0.38), transparent 48%),
+    linear-gradient(150deg, #eff6e3 0%, #e1eed0 100%);
+  border-color: rgba(168, 198, 134, 0.72);
+}
+
+.gair-home .gair-league-card.gair-badminton::before {
+  background: linear-gradient(90deg, #8ec94d, #3bb899, transparent);
+}
+
+.gair-home .gair-card-badge {
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(6px);
+  font-weight: 600;
+}
+
+.gair-home .gair-card-counts {
+  gap: 14px;
+}
+
+.gair-home .gair-card-counts > span {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 9px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(198, 214, 184, 0.68);
+}
+
+.gair-home .gair-card-counts b {
+  font-weight: 700;
+  color: #1f4431;
+}
+
+.gair-home .gair-card-actions a {
+  border-radius: 10px;
+  transition:
+    transform 0.22s var(--gair-ease),
+    box-shadow 0.22s ease,
+    background-color 0.22s ease,
+    color 0.22s ease;
+}
+
+.gair-home .gair-card-actions a:first-child {
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1d3d2e, #2f5c45);
+  box-shadow: 0 10px 22px -12px rgba(21, 49, 36, 0.58);
+}
+
+.gair-home .gair-card-actions a:first-child:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px -12px rgba(21, 49, 36, 0.68);
+}
+
+.gair-home .gair-badminton .gair-card-actions a:first-child {
+  background: linear-gradient(135deg, #c9f085, #aad95e);
+  color: #173424;
+  font-weight: 700;
+  box-shadow: 0 10px 22px -10px rgba(133, 187, 56, 0.52);
+}
+
+.gair-home .gair-badminton .gair-card-actions a:first-child:hover {
+  box-shadow: 0 14px 28px -10px rgba(133, 187, 56, 0.68);
+}
+
+.gair-home .gair-values {
+  border-top: 0;
+  border-bottom: 0;
+  padding: 6px 0 12px;
+  gap: 18px;
+}
+
+.gair-home .gair-values > div {
+  padding: 20px 22px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(196, 212, 182, 0.65);
+  box-shadow: var(--gair-shadow-sm);
+  transition: transform 0.24s var(--gair-ease), box-shadow 0.24s ease;
+}
+
+.gair-home .gair-values > div:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--gair-shadow-md);
+}
+
+.gair-home .gair-values svg {
+  padding: 5px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #eaf4dc;
+  color: #3a6838;
+}
+
+.gair-home .gair-values b {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1b382a;
+}
+
+.gair-home .gair-home-footer {
+  margin-top: 22px;
+  border-top: 1px solid rgba(196, 212, 182, 0.65);
+}
+
+/* ---------- Season Trailers & Announcements ---------- */
+.season-showcase .season-trailer-card {
+  border-radius: 16px;
+  border: 1px solid rgba(190, 208, 175, 0.72);
+  box-shadow: var(--gair-shadow-md);
+  transition:
+    transform 0.28s var(--gair-ease),
+    box-shadow 0.28s ease,
+    border-color 0.25s ease;
+}
+
+.season-showcase .season-trailer-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(145, 184, 102, 0.85);
+  box-shadow: var(--gair-shadow-lg);
+}
+
+.season-trailer-card .season-trailer-label b {
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-weight: 700;
+}
+
+.season-trailer-card .season-trailer-copy a {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #edf5e1;
+  font-weight: 600;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.season-trailer-card .season-trailer-copy a:hover {
+  background: #dff0c8;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.league-announcements .league-announcement-card {
+  border-radius: 15px;
+  border: 1px solid rgba(193, 211, 177, 0.72);
+  background: linear-gradient(160deg, #ffffff 0%, #f7fbf1 100%);
+  box-shadow: var(--gair-shadow-sm);
+  transition: transform 0.24s var(--gair-ease), box-shadow 0.24s ease, border-color 0.24s ease;
+}
+
+.league-announcements .league-announcement-card:hover {
+  transform: translateY(-2px);
+  border-color: #a9c68a;
+  box-shadow: var(--gair-shadow-md);
+}
+
+.league-announcement-card .league-announcement-label {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ebf5dd;
+  color: #486e33;
+  font-weight: 700;
+}
+
+/* ---------- Football & Badminton Sidebars ---------- */
+.app-shell .sidebar,
+.gb-app .gb-sidebar {
+  background:
+    radial-gradient(ellipse 140% 45% at 0% 0%, rgba(197, 239, 131, 0.11), transparent 55%),
+    linear-gradient(180deg, #13241d 0%, #1d352a 100%);
+  border-right: 1px solid rgba(197, 239, 131, 0.1);
+  box-shadow: 8px 0 32px -20px rgba(7, 20, 14, 0.55);
+}
+
+.sidebar .nav-item,
+.gb-sidebar .gb-navigation button,
+.gb-sidebar .gb-navigation .gb-gallery-link {
+  border-radius: 10px;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s var(--gair-ease),
+    box-shadow 0.2s ease;
+}
+
+.sidebar .nav-item:hover,
+.gb-sidebar .gb-navigation button:hover,
+.gb-sidebar .gb-navigation .gb-gallery-link:hover {
+  transform: translateX(3px);
+}
+
+.sidebar .nav-item.active,
+.gb-sidebar .gb-navigation button[aria-current] {
+  background: linear-gradient(90deg, rgba(197, 239, 131, 0.18), rgba(197, 239, 131, 0.06));
+  box-shadow: inset 3px 0 0 #c5ef83;
+}
+
+.singles-shell .sidebar .nav-item.active {
+  background: linear-gradient(90deg, rgba(184, 223, 245, 0.22), rgba(184, 223, 245, 0.06));
+  box-shadow: inset 3px 0 0 #b8dff5;
+}
+
+/* ---------- Sub-page Heroes & Scoreboards ---------- */
+.app-shell .hero,
+.gb-app .gb-hero,
+.league-gallery .gallery-hero {
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse 65% 85% at 88% 12%, rgba(197, 239, 131, 0.22), transparent 58%),
+    radial-gradient(ellipse 50% 60% at 8% 100%, rgba(65, 152, 118, 0.18), transparent 56%),
+    linear-gradient(128deg, #132920 0%, #214435 55%, #173327 100%);
+  border: 1px solid rgba(197, 239, 131, 0.2);
+  box-shadow:
+    0 24px 54px -26px rgba(10, 31, 22, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.app-shell .scoreboard {
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse 60% 80% at 50% 0%, rgba(197, 239, 131, 0.16), transparent 62%),
+    linear-gradient(135deg, #152e23 0%, #244736 100%);
+  box-shadow: var(--gair-shadow-lg);
+}
+
+.gb-app .gb-scoreboard {
+  border-radius: 16px;
+  box-shadow: var(--gair-shadow-md);
+}
+
+/* ---------- Cards, Stats, Panels & Tables ---------- */
+.app-shell .stat,
+.gb-app .gb-stat-grid > div,
+.app-shell .own-goal-metrics > div {
+  border-radius: 14px;
+  border-color: rgba(198, 212, 186, 0.72);
+  background: linear-gradient(180deg, #ffffff 0%, #fafcf7 100%);
+  box-shadow: var(--gair-shadow-sm);
+  transition: transform 0.24s var(--gair-ease), box-shadow 0.24s ease, border-color 0.24s ease;
+}
+
+.app-shell .stat:hover,
+.gb-app .gb-stat-grid > div:hover,
+.app-shell .own-goal-metrics > div:hover {
+  transform: translateY(-3px);
+  border-color: #aac78c;
+  box-shadow: var(--gair-shadow-md);
+}
+
+.app-shell .stat strong,
+.gb-app .gb-stat-grid strong,
+.app-shell .own-goal-metrics strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell .panel,
+.gb-app .gb-panel,
+.app-shell .rank-history {
+  border-radius: 15px;
+  border-color: rgba(198, 212, 186, 0.72);
+  box-shadow: var(--gair-shadow-sm);
+}
+
+.app-shell .match-card,
+.gb-app .gb-match-card,
+.app-shell .player-card,
+.gb-app .gb-player-card,
+.league-gallery .gallery-card,
+.app-shell .scorer-podium {
+  border-radius: 14px;
+  box-shadow: 0 6px 18px -14px rgba(17, 42, 31, 0.22);
+  transition:
+    transform 0.26s var(--gair-ease),
+    box-shadow 0.26s ease,
+    border-color 0.22s ease;
+}
+
+.app-shell .match-card:hover,
+.gb-app .gb-match-card:hover,
+.app-shell .player-card:hover,
+.gb-app .gb-player-card:hover,
+.league-gallery .gallery-card:hover,
+.app-shell .scorer-podium:hover {
+  transform: translateY(-3px);
+  border-color: #9ec07b;
+  box-shadow: var(--gair-shadow-md);
+}
+
+.league-gallery .gallery-card img {
+  transition: transform 0.45s var(--gair-ease);
+}
+
+.league-gallery .gallery-card:hover img {
+  transform: scale(1.06);
+}
+
+.league-gallery .gallery-albums a {
+  border-radius: 14px;
+  box-shadow: var(--gair-shadow-sm);
+  transition: transform 0.22s var(--gair-ease), box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.league-gallery .gallery-albums a:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--gair-shadow-md);
+}
+
+.app-shell .profile-hero,
+.gb-app .gb-profile-hero {
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 92% 14%, rgba(197, 239, 131, 0.32), transparent 46%),
+    linear-gradient(145deg, #eef5e3 0%, #e1ecd2 100%);
+  box-shadow: var(--gair-shadow-sm);
+}
+
+.app-shell .scorer-podium.pos-0 {
+  background: linear-gradient(145deg, #f0f7e4 0%, #e2efd0 100%);
+  border-color: #b7d393;
+}
+
+table tbody tr {
+  transition: background-color 0.16s ease;
+}
+
+table tbody tr:hover td {
+  background: rgba(235, 245, 222, 0.48);
+}
+
+.status.live i {
+  animation: gair-pulse-dot 1.6s ease-in-out infinite;
+  box-shadow: 0 0 0 4px rgba(106, 156, 57, 0.25);
+}
+
+/* ---------- Elevated Buttons ---------- */
+.app-shell .btn,
+.gb-app .gb-btn,
+.league-gallery .gallery-primary,
+.league-gallery .gallery-secondary {
+  border-radius: 9px;
+  transition:
+    transform 0.2s var(--gair-ease),
+    box-shadow 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.app-shell .btn:hover:not(:disabled),
+.gb-app .gb-btn:hover:not(:disabled),
+.league-gallery .gallery-primary:hover:not(:disabled),
+.league-gallery .gallery-secondary:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.app-shell .btn.lime,
+.gb-app .gb-btn.gb-lime,
+.league-gallery .gallery-primary {
+  background: linear-gradient(135deg, #d7fa8e, #b8e867);
+  color: #163123;
+  font-weight: 700;
+  box-shadow: 0 10px 22px -12px rgba(140, 200, 56, 0.65);
+}
+
+.app-shell .btn.primary,
+.gb-app .gb-btn.gb-primary {
+  background: linear-gradient(135deg, #1f4132, #2f5e47);
+  box-shadow: 0 10px 22px -12px rgba(21, 51, 37, 0.55);
+}
+
+.singles-shell .btn.primary {
+  background: linear-gradient(135deg, #1d5773, #2b7596);
+}
+
+/* ---------- Animations ---------- */
+@keyframes gair-pulse-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.72;
+  }
+}
+
+@keyframes gair-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(12deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(15deg);
+  }
+}
+
+@keyframes gair-hero-sweep {
+  0%,
+  18% {
+    transform: translateX(-10%) skewX(-18deg);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    transform: translateX(360%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 1000px) {
+  .gair-home .gair-header,
+  .league-gallery .gair-header {
+    padding-inline: 28px;
+  }
+}
+
+@media (max-width: 680px) {
+  .gair-home .gair-header,
+  .league-gallery .gair-header {
+    padding-inline: 18px;
+  }
+
+  .gair-header-actions .gair-nav-link:last-child {
+    padding: 8px 12px;
+  }
+
+  .gair-home .gair-values > div {
+    padding: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gair-home .gair-welcome::after,
+  .gair-home .gair-hero-visual > svg:not(.gair-court-art),
+  .gair-header-note i,
+  .gair-league-card .gair-card-badge i,
+  .status.live i {
+    animation: none !important;
+  }
+
+  .gair-home .gair-league-card:hover,
+  .app-shell .stat:hover,
+  .gb-app .gb-stat-grid > div:hover,
+  .app-shell .match-card:hover,
+  .gb-app .gb-match-card:hover,
+  .app-shell .player-card:hover,
+  .gb-app .gb-player-card:hover,
+  .league-gallery .gallery-card:hover {
+    transform: none !important;
+  }
+}

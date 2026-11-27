@@ -4,4 +4,5 @@ import App from './LeagueApp';
 import './styles.css';
 import './analytics.css';
 import './singles.css';
+import './visual-upgrade.css';
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

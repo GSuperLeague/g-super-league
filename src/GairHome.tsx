@@ -13,6 +13,7 @@ import gbLeagueLogo from "./assets/gb-league-logo-640.png";
 import gSuperLeagueLogo from "./assets/g-super-league-logo-640.png";
 import { LeagueAnnouncements } from "./LeagueAnnouncements";
 import { SeasonTrailers } from "./SeasonTrailers";
+import { HomeGallerySpotlight } from "./HomeGallerySpotlight";
 import { FOOTBALL_SPIN_TRIAL_PERIOD, footballSeasonLabel } from "../lib/season-promos.ts";
 import { CURRENT_SEASON } from "../lib/seasons.ts";
 import "./gair.css";
@@ -169,6 +170,7 @@ export default function GairHome() {
             <span className="gair-visual-caption">小小球场，大大热爱。</span>
           </div>
         </section>
+        <HomeGallerySpotlight />
         <SeasonTrailers season={CURRENT_SEASON} />
         <LeagueAnnouncements />
         <div className="gair-section-heading">
