@@ -723,12 +723,10 @@
     gap: 4px;
   }
   .match-elo-table .tier-emblem {
-    width: 22px;
-    height: 26px;
-    flex-basis: 22px;
-  }
-  .match-elo-table .tier-emblem-face {
-    inset: 1.5px 1.5px 2px;
+    --emblem-size: 24px;
+    width: 24px;
+    height: 24px;
+    flex-basis: 24px;
   }
 }
 .data-empty {

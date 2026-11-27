@@ -1,56 +1,37 @@
-import {
-  Award,
-  Crown,
-  Diamond,
-  Gem,
-  Hexagon,
-  Shield,
-  ShieldHalf,
-  Sparkles,
-  Swords,
-} from "lucide-react";
 import type { CSSProperties } from "react";
 import { RANK_TIERS, rankTier } from "../lib/rating.ts";
 import type { RankTier } from "../lib/rating.ts";
+import { TierBadgeSvg } from "./RankBadges.tsx";
 import "./rank.css";
 
-const icons = {
-  iron: Shield,
-  bronze: ShieldHalf,
-  silver: Hexagon,
-  gold: Award,
-  platinum: Diamond,
-  diamond: Gem,
-  master: Sparkles,
-  grandmaster: Swords,
-  king: Crown,
-};
-
-function TierEmblem({ tier, phase = 0 }: { tier: RankTier; phase?: number }) {
-  const Icon = icons[tier.id];
-  const crowned = tier.id === "grandmaster" || tier.id === "king";
+export function TierEmblem({
+  tier,
+  phase = 0,
+  size,
+}: {
+  tier: RankTier;
+  phase?: number;
+  size?: number;
+}) {
+  const style: CSSProperties & {
+    "--shine-phase"?: string;
+    "--emblem-size"?: string;
+  } = {
+    "--shine-phase": `${-phase * 0.53}s`,
+  };
+  if (size) {
+    style["--emblem-size"] = `${size}px`;
+  }
   return (
     <span
       className={`tier-emblem tier-${tier.id}`}
-      style={{ "--shine-phase": `${-phase * 0.53}s` } as CSSProperties}
+      style={style}
       aria-hidden="true"
     >
       <span className="tier-emblem-aura" />
-      <span className="tier-emblem-wings" />
-      <span className="tier-emblem-mantle" />
       <span className="tier-emblem-frame">
-        <span className="tier-emblem-face">
-          <Icon strokeWidth={1.7} />
-          <span className="tier-emblem-sheen" />
-        </span>
+        <TierBadgeSvg tierId={tier.id} />
       </span>
-      <span className="tier-emblem-collar" />
-      {crowned && (
-        <span className="tier-emblem-coronet">
-          <Crown strokeWidth={1.7} />
-        </span>
-      )}
-      <span className="tier-emblem-jewel" />
     </span>
   );
 }
@@ -67,6 +48,7 @@ export function RankScore({
   return (
     <span
       className={`rank-score${showTier ? " rank-score-labeled" : ""}`}
+      data-tier={tier.id}
       title={label}
       aria-label={label}
     >
@@ -81,7 +63,7 @@ export function RankLegend() {
   return (
     <div className="rank-legend" aria-label="段位分数对照">
       {RANK_TIERS.map((tier, i) => (
-        <div key={tier.id}>
+        <div key={tier.id} className={`rank-legend-item tier-card-${tier.id}`}>
           <TierEmblem tier={tier} phase={i * 2} />
           <span>
             <b>{tier.name}</b>
